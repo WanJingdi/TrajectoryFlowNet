@@ -28,8 +28,10 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 import matplotlib.animation as animation
 import scipy.stats as stats
 from matplotlib.patches import Polygon
+import sys
 
-os.environ['CUDA_VISIBLE_DEVICES']='5'
+
+os.environ['CUDA_VISIBLE_DEVICES']='2'
 np.random.seed(1234)
 torch.cuda.manual_seed_all(1234)
 torch.manual_seed(1234)
@@ -86,7 +88,7 @@ class TrajectoryNSNet():
         self.lambda_1 = torch.tensor([0.0], requires_grad=True).to(device)
         self.lambda_1 = nn.Parameter(self.lambda_1)
 
-        self.net_1.load_state_dict(torch.load("suanli3nopretrainnet1.pth"))
+        self.net_1.load_state_dict(torch.load("suanli3net1nopretrain_all_aug_10000.pth"))
 
         self.optimizer = torch.optim.LBFGS(
             self.net_1.parameters(),
@@ -330,8 +332,27 @@ for i in index[:-1]:
 index = np.array(index)
 N_p = int(0.8 * len(index))
 N_p_test = int(0.15 * len(index))
+
+
+
+all_idx = np.arange(index.shape[0]-1)
 idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-idx_test = np.random.choice(int(np.setdiff1d(index.shape[0]-1, idx_p)), N_p_test, replace=False)
+remaining = np.setdiff1d(all_idx, idx_p)
+
+
+idx_test = np.random.choice(remaining, N_p_test, replace=False)
+remaining_idx = np.setdiff1d(np.arange(index.shape[0]-1), idx_p)
+
+idx_p_sort = np.sort(idx_p)
+idx_test_sort = np.sort(idx_test)
+
+leak = list(set(idx_p) & set(idx_test))
+
+if leak:
+    print(f"Leakage detected: {leak}")
+    sys.exit(1)
+
+
 idx_p1 = [i+1 for i in idx_test]
 index_N = index[idx_test]
 delta_index = index[idx_p1] - index_N
@@ -530,6 +551,18 @@ print('Error y: %e' % (error_y))
 # print('Error u: %e' % (error_u))
 # print('Error v: %e' % (error_v))
 # print('Error p: %e' % (error_p))
+
+x_test_L = x_test * L
+y_test_L = y_test * L
+x_pred_L = x_pred * L
+y_pred_L = y_pred * L
+mae_x = np.mean(np.abs(x_test_L  - x_pred_L))
+mae_y = np.mean(np.abs(y_test_L - y_pred_L))
+
+print('Mean Absolute Error x: %e' % (mae_x))
+print('Mean Absolute Error y: %e' % (mae_y))
+
+
 x_test_pearsonr = x_test.flatten()
 y_test_pearsonr = y_test.flatten()
 x_pred_pearsonr = x_pred.flatten()
@@ -541,16 +574,18 @@ coefficient_y_test,_ = stats.pearsonr(y_test_pearsonr,y_pred_pearsonr)
 print('coefficient x: %e' % (coefficient_x_test))
 print('coefficient y: %e' % (coefficient_y_test))
 ############训练集############
-fig = plt.figure(figsize=(12, 12), dpi=600)
+fig = plt.figure(figsize=(6, 3), dpi=300)
 ax = fig.add_subplot(111)
-
-plt.scatter(x_test,y_test,s =1, marker="^",c='r')
-plt.scatter(x_pred,y_pred,s =1, marker="^",c='b')
+plt.rcParams['svg.fonttype'] = 'none'
+plt.scatter(x_test,y_test,s =0.5, marker="o",color='#666666')
+plt.scatter(x_pred,y_pred,s =0.5, marker="o",color='#FAAF78')
+plt.scatter(x0_test,y0_test,s =1, marker="o",color='red')
 #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
 ax.set_xlabel('$x$', size=20)
 ax.set_ylabel('$y$', size=20)
 ax.set_title('particle test', fontsize = 20)
 plt.axis('equal')
+fig.savefig('3_all_particals_scatter'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
 
@@ -689,11 +724,50 @@ relative_errors_x = relative_errors_x[:,None]
 diff_y = NE_y - NT_y
 norm_diff_y = nan_norm(diff_y,axis=1)
 norm_test_y = nan_norm(NT_y, axis=1)
-relative_errors_y = norm_diff_y / norm_test_x
+relative_errors_y = norm_diff_y / norm_test_y
 relative_errors_y = relative_errors_y[:,None]
 
-relative_errors_xy = np.hstack([relative_errors_x,relative_errors_y])
-np.savetxt('3l2trajectory.csv', relative_errors_xy, fmt='%.18f', delimiter=',', newline='\n')
+
+NE_r = np.sqrt(NE_x**2 + NE_y**2)
+NT_r = np.sqrt(NT_x**2 + NT_y**2)
+
+diff_r = NE_r - NT_r
+norm_diff_r = nan_norm(diff_r, axis=1)
+norm_test_r = nan_norm(NT_r, axis=1)
+relative_errors_r = (norm_diff_r / norm_test_r)[:, None]
+
+relative_errors_xy = np.hstack([relative_errors_x,relative_errors_y, relative_errors_r])
+np.savetxt('Case3l2trajectory.csv', relative_errors_xy, fmt='%.18f', delimiter=',', newline='\n')
+
+pearson_r_x = np.zeros(NE_x.shape[0])
+pearson_r_y = np.zeros(NE_y.shape[0])
+pearson_r_r = np.zeros(NE_r.shape[0])
+
+for i in range(NE_x.shape[0]):
+    # 过滤掉NaN值
+    valid_mask_x = ~np.isnan(NE_x[i]) & ~np.isnan(NT_x[i])
+    valid_NE_x = NE_x[i][valid_mask_x]
+    valid_NT_x = NT_x[i][valid_mask_x]
+
+    valid_mask_y = ~np.isnan(NE_y[i]) & ~np.isnan(NT_y[i])
+    valid_NE_y = NE_y[i][valid_mask_y]
+    valid_NT_y = NT_y[i][valid_mask_y]
+
+    valid_mask_r = ~np.isnan(NE_r[i]) & ~np.isnan(NT_r[i])
+    valid_NE_r = NE_r[i][valid_mask_r]
+    valid_NT_r = NT_r[i][valid_mask_r]
+
+
+    pearson_r_x[i], _ = stats.pearsonr(valid_NE_x, valid_NT_x)
+    pearson_r_y[i], _ = stats.pearsonr(valid_NE_y, valid_NT_y)
+    pearson_r_r[i], _ = stats.pearsonr(valid_NE_r, valid_NT_r)
+
+
+# 组合并保存结果
+pearson_r_xy = np.hstack([pearson_r_x[:, None], pearson_r_y[:, None], pearson_r_r[:, None]])
+np.savetxt('Case3_pearson_r_values.csv', pearson_r_xy,
+           fmt='%.18f', delimiter=',', newline='\n',
+           comments='')
 
 # NE_x = NE_x_line[index_plot[0]:index_plot[0]+delta_index[0]]
 # NE_y = NE_y_line[index_plot[0]:index_plot[0]+delta_index[0]]
@@ -1487,153 +1561,153 @@ plt.rcParams['svg.fonttype'] = 'none'
 fig.savefig('3particle test 63 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
-
-###############################################################################################
-delta_index = delta_index.tolist()
-fig = plt.figure(figsize=(9, 6), dpi=300)
-ax = fig.add_subplot(111)
-i = 674
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-plt.scatter(x_test,y_test,s =1, marker="^",c='y')
-plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
-plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.set_title('particle test 674', fontsize = 20)
-plt.legend()
-ax.tick_params(labelsize=15)
-plt.axis('equal')
-#fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-fig = plt.figure(figsize=(9, 6), dpi=300)
-ax = fig.add_subplot(111)
-i = 420
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-plt.scatter(x_test,y_test,s =1, marker="^",c='y')
-plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
-plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.set_title('particle test 420', fontsize = 20)
-plt.legend()
-ax.tick_params(labelsize=15)
-plt.axis('equal')
-#fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-fig = plt.figure(figsize=(9, 6), dpi=300)
-ax = fig.add_subplot(111)
-i = 552
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-plt.scatter(x_test,y_test,s =1, marker="^",c='y')
-plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
-plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.set_title('particle test 552', fontsize = 20)
-plt.legend()
-ax.tick_params(labelsize=15)
-plt.axis('equal')
-#fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-fig = plt.figure(figsize=(9, 6), dpi=300)
-ax = fig.add_subplot(111)
-i = 552
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
-plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.set_title('particle test 552', fontsize = 20)
-plt.legend()
-ax.tick_params(labelsize=15)
-plt.axis('equal')
-#fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-fig = plt.figure(figsize=(9, 6), dpi=300)
-ax = fig.add_subplot(111)
-i = 1044
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-plt.scatter(x_test,y_test,s =1, marker="^",c='y')
-plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
-plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.set_title('particle test 1044', fontsize = 20)
-plt.legend()
-ax.tick_params(labelsize=15)
-plt.axis('equal')
-#fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-
-fig = plt.figure(figsize=(9, 6), dpi=300)
-ax = fig.add_subplot(111)
-i = 61
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-plt.scatter(x_test,y_test,s =1, marker="^",c='y')
-plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
-plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.set_title('particle test 61', fontsize = 20)
-plt.legend()
-ax.tick_params(labelsize=15)
-plt.axis('equal')
-#fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-fig = plt.figure(figsize=(9, 6), dpi=300)
-ax = fig.add_subplot(111)
-i = 28
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-plt.scatter(x_test,y_test,s =1, marker="^",c='y')
-plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
-plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.set_title('particle test 38', fontsize = 20)
-plt.legend()
-ax.tick_params(labelsize=15)
-plt.axis('equal')
-#fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-
-fig = plt.figure(figsize=(10,10),dpi = 330 )
-ax = fig.add_subplot(111, projection='3d')
-
-sc1 = ax.scatter(x_test[plot_number:plot_number + delta_index[i]],t_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]] ,s =2, marker="o",c='r')
-# 为了在图中显示颜色条，我们需要创建一个ScalarMappable对象
-sc2 = ax.scatter(x_pred[plot_number:plot_number + delta_index[i]],t_test[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]] ,s =2, marker="o",c='b')
-
-# 将归一化后的刻度位置转换为原始的z值，并设置颜色条的刻度标签
-
-plt.show()
-# ########################################################
+#
+# ###############################################################################################
+# # delta_index = delta_index.tolist()
+# fig = plt.figure(figsize=(9, 6), dpi=300)
+# ax = fig.add_subplot(111)
+# i = 674
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# plt.scatter(x_test,y_test,s =1, marker="^",c='y')
+# plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
+# plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
+# ax.set_xlabel('$x$', size=20)
+# ax.set_ylabel('$y$', size=20)
+# ax.set_title('particle test 674', fontsize = 20)
+# plt.legend()
+# ax.tick_params(labelsize=15)
+# plt.axis('equal')
+# #fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+# fig = plt.figure(figsize=(9, 6), dpi=300)
+# ax = fig.add_subplot(111)
+# i = 420
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# plt.scatter(x_test,y_test,s =1, marker="^",c='y')
+# plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
+# plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
+# ax.set_xlabel('$x$', size=20)
+# ax.set_ylabel('$y$', size=20)
+# ax.set_title('particle test 420', fontsize = 20)
+# plt.legend()
+# ax.tick_params(labelsize=15)
+# plt.axis('equal')
+# #fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+# fig = plt.figure(figsize=(9, 6), dpi=300)
+# ax = fig.add_subplot(111)
+# i = 552
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# plt.scatter(x_test,y_test,s =1, marker="^",c='y')
+# plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
+# plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
+# ax.set_xlabel('$x$', size=20)
+# ax.set_ylabel('$y$', size=20)
+# ax.set_title('particle test 552', fontsize = 20)
+# plt.legend()
+# ax.tick_params(labelsize=15)
+# plt.axis('equal')
+# #fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+# fig = plt.figure(figsize=(9, 6), dpi=300)
+# ax = fig.add_subplot(111)
+# i = 552
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
+# plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
+# ax.set_xlabel('$x$', size=20)
+# ax.set_ylabel('$y$', size=20)
+# ax.set_title('particle test 552', fontsize = 20)
+# plt.legend()
+# ax.tick_params(labelsize=15)
+# plt.axis('equal')
+# #fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+# fig = plt.figure(figsize=(9, 6), dpi=300)
+# ax = fig.add_subplot(111)
+# i = 1044
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# plt.scatter(x_test,y_test,s =1, marker="^",c='y')
+# plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
+# plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
+# ax.set_xlabel('$x$', size=20)
+# ax.set_ylabel('$y$', size=20)
+# ax.set_title('particle test 1044', fontsize = 20)
+# plt.legend()
+# ax.tick_params(labelsize=15)
+# plt.axis('equal')
+# #fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+#
+# fig = plt.figure(figsize=(9, 6), dpi=300)
+# ax = fig.add_subplot(111)
+# i = 61
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# plt.scatter(x_test,y_test,s =1, marker="^",c='y')
+# plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
+# plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
+# ax.set_xlabel('$x$', size=20)
+# ax.set_ylabel('$y$', size=20)
+# ax.set_title('particle test 61', fontsize = 20)
+# plt.legend()
+# ax.tick_params(labelsize=15)
+# plt.axis('equal')
+# #fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+# fig = plt.figure(figsize=(9, 6), dpi=300)
+# ax = fig.add_subplot(111)
+# i = 28
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# plt.scatter(x_test,y_test,s =1, marker="^",c='y')
+# plt.scatter(x_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]],s =10, marker="x",c='r',label='True')
+# plt.scatter(x_pred[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]],s =10, marker="^",c='b', label='predict')
+# ax.set_xlabel('$x$', size=20)
+# ax.set_ylabel('$y$', size=20)
+# ax.set_title('particle test 38', fontsize = 20)
+# plt.legend()
+# ax.tick_params(labelsize=15)
+# plt.axis('equal')
+# #fig.savefig('single_partical'  + ".png", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+#
+# fig = plt.figure(figsize=(10,10),dpi = 330 )
+# ax = fig.add_subplot(111, projection='3d')
+#
+# sc1 = ax.scatter(x_test[plot_number:plot_number + delta_index[i]],t_test[plot_number:plot_number + delta_index[i]],y_test[plot_number:plot_number + delta_index[i]] ,s =2, marker="o",c='r')
+# # 为了在图中显示颜色条，我们需要创建一个ScalarMappable对象
+# sc2 = ax.scatter(x_pred[plot_number:plot_number + delta_index[i]],t_test[plot_number:plot_number + delta_index[i]],y_pred[plot_number:plot_number + delta_index[i]] ,s =2, marker="o",c='b')
+#
+# # 将归一化后的刻度位置转换为原始的z值，并设置颜色条的刻度标签
+#
+# plt.show()
+# # ########################################################
 # fig = plt.figure()
 # ax1= fig.add_subplot(121)
 # ax2= fig.add_subplot(122)

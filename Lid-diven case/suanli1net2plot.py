@@ -25,8 +25,10 @@ import cv2
 import re
 import matplotlib.colors as mcolors
 import h5py
+import sys
 
-os.environ['CUDA_VISIBLE_DEVICES']='5'
+
+os.environ['CUDA_VISIBLE_DEVICES']='4'
 np.random.seed(1234)
 torch.cuda.manual_seed_all(1234)
 torch.manual_seed(1234)
@@ -89,7 +91,7 @@ class TrajectoryNSNet():
         )
         self.optimizer_Adam = torch.optim.Adam(self.net_2.parameters(), lr=0.001)
         self.iter = 0
-        self.net_2.load_state_dict(torch.load("suanli1nopretrainnet2.pth"))
+        self.net_2.load_state_dict(torch.load("suanli1nopretrainnet2_sparse160.pth"))
 
     def net_x_psi_p(self, x, y, t1, B):
         psi_p = self.net_2(x, y, t1, B)
@@ -432,25 +434,145 @@ for i in index[:-1]:
         x00_train.append(x0)
         y00_train.append(y0)
 
+
+
+
+
+
+
+
+
+
+#####################################
+filename_test = "export3.csv"
+
+x_Matrix_test = pd.read_csv(filename_test, header=3)
+train_data_test = np.array(x_Matrix_test)
+
+#print('从fluent导出的训练数据为：')
+train_data_test = np.delete(train_data_test, 2, axis=1)
+# train_data = np.delete(train_data, 4, axis=1)
+# train_data = np.delete(train_data, 0, axis=0)
+train_data_test = train_data_test.astype(float)
+np.set_printoptions(suppress=True)
+#print(train_data_test)
+# index = np.argwhere(train_data[:, 3:4] == 0.500999987 or train_data[:, 3:4] == 0.550999999 or train_data[:, 3:4] == 0.550999999)[:, 0:1].flatten()
+# N_p = 500
+# idx_p = np.random.choice(index.shape[0], N_p, replace=False)
+# index = index[idx_p]
+
+id_test = train_data_test[:, 2:3]
+x_test = train_data_test[:, 0:1]
+y_test = train_data_test[:, 1:2]
+t_test = train_data_test[:, 3:4]
+p_test = train_data_test[:, 6:7]
+u_test = train_data_test[:, 4:5]
+v_test = train_data_test[:, 5:6]
+
+
+extrater_test = []
+for i in range(len(x_test)):
+    if t_test[i]<22:
+        extrater_test.append(i)
+
+id_test = np.delete(id_test, extrater_test, axis=0)
+x_test = np.delete(x_test, extrater_test, axis=0)
+y_test = np.delete(y_test, extrater_test, axis=0)
+t_test = np.delete(t_test, extrater_test, axis=0)
+p_test = np.delete(p_test, extrater_test, axis=0)
+u_test = np.delete(u_test, extrater_test, axis=0)
+v_test = np.delete(v_test, extrater_test, axis=0)
+
+
+
+index_test = find_diff_positions(id_test)
+index_test.append(int(len(id_test)))
+# for i in index:
+#     print(id[i])
+# x = [i-0.01 for i in x]
+# y = [i+0.02 for i in y]
+# u_min = min(abs(u))
+# v_min = min(abs(v))
+# uv_min = float(min(u_min, v_min))
+
+
+t_test = [i-22 for i in t_test]
+# u = [i-uv_min for i in u]
+# v = [i-uv_min for i in v]
+
+x_test = np.array(x_test).flatten()[:, None]
+y_test = np.array(y_test).flatten()[:, None]
+p_test = np.array(p_test).flatten()[:, None]
+u_test = np.array(u_test).flatten()[:, None]
+v_test = np.array(v_test).flatten()[:, None]
+t_test = np.array(t_test).flatten()[:, None]
+
+
+# U = 1
+# L = 0.01
+x_test = x_test / L
+y_test = y_test / L
+t_test = t_test * (U / L)
+u_test = u_test / U
+v_test = v_test / U
+p_test = p_test / (1 * (U ** 2))
+
+k = 0
+x00_test = []
+y00_test = []
+t00_test = []
+x0_test = []
+y0_test = []
+t0_test = []
+x_net_test =[]
+y_net_test =[]
+t_net_test =[]
+u_net_test =[]
+v_net_test =[]
+p_net_test =[]
+# delta_i = 1400
+
+for i in index_test[:-1]:
+    x0 = x_test[i]
+    y0 = y_test[i]
+    t0 = t_test[i]
+    delta_i = index_test[k+1] - index_test[k]
+    k = k+1
+    for j in range(delta_i):
+        x00_test.append(x0)
+        y00_test.append(y0)
+        t00_test.append(t0)
+
+
+
+#####################################
+
+
+
+
 # k = 0
 # for i in index:
-index = np.array(index)
-N_p = 200
+index_test = np.array(index_test)
+N_p = 100
 N_p_test = 100
-idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-idx_test = np.random.choice(int(np.setdiff1d(index.shape[0]-1, idx_p)), N_p_test, replace=False)
-idx_p1 = [i+1 for i in idx_p]
-index_N = index[idx_p]
-delta_index = index[idx_p1] - index_N
+
+
+idx_test = np.random.choice(index_test.shape[0]-1, N_p_test, replace=False)
+
+idx_p1 = [i+1 for i in idx_test]
+index_N = index_test[idx_test]
+
+delta_index = index_test[idx_p1] - index_N
 for i in range(int(len(index_N))):
-    x0_train.append(x00_train[index_N[i]:index_N[i]+delta_index[i]])
-    y0_train.append(y00_train[index_N[i]:index_N[i]+delta_index[i]])
-    x_net.append(x_train[index_N[i]:index_N[i]+delta_index[i]])
-    y_net.append(y_train[index_N[i]:index_N[i]+delta_index[i]])
-    t_net.append(t_train[index_N[i]:index_N[i]+delta_index[i]])
-    u_net.append(u_train[index_N[i]:index_N[i]+delta_index[i]])
-    v_net.append(v_train[index_N[i]:index_N[i]+delta_index[i]])
-    p_net.append(p_train[index_N[i]:index_N[i]+delta_index[i]])
+    x0_test.append(x00_test[index_N[i]:index_N[i] + delta_index[i]])
+    y0_test.append(y00_test[index_N[i]:index_N[i] + delta_index[i]])
+    t0_test.append(t00_test[index_N[i]:index_N[i] + delta_index[i]])
+    x_net_test.append(x_test[index_N[i]:index_N[i]+delta_index[i]])
+    y_net_test.append(y_test[index_N[i]:index_N[i]+delta_index[i]])
+    t_net_test.append(t_test[index_N[i]:index_N[i]+delta_index[i]])
+    u_net_test.append(u_test[index_N[i]:index_N[i]+delta_index[i]])
+    v_net_test.append(v_test[index_N[i]:index_N[i]+delta_index[i]])
+    p_net_test.append(p_test[index_N[i]:index_N[i]+delta_index[i]])
 
 # x_in = x_train
 # y_in = y_train
@@ -464,23 +586,25 @@ for i in range(int(len(index_N))):
 # u_net.append(u_in)
 # v_net.append(v_in)
 # p_net.append(p_in)
-x0_train = list(flatten(x0_train))
-y0_train = list(flatten(y0_train))
-x_net = list(flatten(x_net))
-y_net = list(flatten(y_net))
-u_net = list(flatten(u_net))
-v_net = list(flatten(v_net))
-p_net = list(flatten(p_net))
-t_net = list(flatten(t_net))
+x0_test = list(flatten(x0_test))
+y0_test = list(flatten(y0_test))
+t0_test = list(flatten(t0_test))
+x_test = list(flatten(x_net_test))
+y_test = list(flatten(y_net_test))
+u_test = list(flatten(u_net_test))
+v_test = list(flatten(v_net_test))
+p_test = list(flatten(p_net_test))
+t_test = list(flatten(t_net_test))
 
-x0_train = np.array(x0_train).flatten()[:, None]
-y0_train = np.array(y0_train).flatten()[:, None]
-x_net = np.array(x_net).flatten()[:, None]
-y_net = np.array(y_net).flatten()[:, None]
-t_net = np.array(t_net).flatten()[:, None]
-u_net = np.array(u_net).flatten()[:, None]
-v_net = np.array(v_net).flatten()[:, None]
-p_net = np.array(p_net).flatten()[:, None]
+x0_test = np.array(x0_test).flatten()[:, None]
+y0_test = np.array(y0_test).flatten()[:, None]
+t0_test = np.array(t0_test).flatten()[:, None]
+x_net = np.array(x_test).flatten()[:, None]
+y_net = np.array(y_test).flatten()[:, None]
+t_net = np.array(t_test).flatten()[:, None]
+u_net = np.array(u_test).flatten()[:, None]
+v_net = np.array(v_test).flatten()[:, None]
+p_net = np.array(p_test).flatten()[:, None]
 
 # fig = plt.figure(figsize=(9, 6), dpi=300)
 # ax = fig.add_subplot(111)
@@ -639,6 +763,43 @@ model = TrajectoryNSNet(B_gauss_2)
 
 
 
+#####################################
+u_test_pred, v_test_pred, p_test_pred = model.predict_uv(x_net, y_net, t_net)
+
+xiuzheng = p_net[100] - p_test_pred[100]
+p_test_pred = p_test_pred + xiuzheng
+
+u_par = u_net * U
+u_test_pred = u_test_pred * U
+v_par = v_net * U
+v_test_pred = v_test_pred * U
+p_par = p_net * (1 * (U ** 2))
+p_test_pred = p_test_pred * (1 * (U ** 2))
+
+error_u_test = np.linalg.norm(u_par - u_test_pred, 2) / np.linalg.norm(u_par, 2)
+error_v_test = np.linalg.norm(v_par - v_test_pred, 2) / np.linalg.norm(v_par, 2)
+error_p_test = np.linalg.norm(p_par - p_test_pred, 2) / np.linalg.norm(p_par, 2)
+mask = (t_net > 0.290) & (t_net < 0.292)
+filtered_data_x = x_net[mask]
+filtered_data_y = y_net[mask]
+# print('Error x test: %e' % (error_x_test))
+# print('Error y test: %e' % (error_y_test))
+wangge_u_pearsonr = u_par.flatten()
+wangge_v_pearsonr = v_par.flatten()
+wangge_p_pearsonr = p_par.flatten()
+u_test_pred_pearsonr = u_test_pred.flatten()
+v_test_pred_pearsonr = v_test_pred.flatten()
+p_test_pred_pearsonr = p_test_pred.flatten()
+
+coefficient_u_test ,_= stats.pearsonr(wangge_u_pearsonr,u_test_pred_pearsonr)
+coefficient_v_test,_ = stats.pearsonr(wangge_v_pearsonr,v_test_pred_pearsonr)
+coefficient_p_test,_ = stats.pearsonr(wangge_p_pearsonr,p_test_pred_pearsonr)
+print('Error u test: %e' % (error_u_test))
+print('Error v test: %e' % (error_v_test))
+print('Error p test: %e' % (error_p_test))
+print('Coefficient u test: %f' % (coefficient_u_test))
+print('Coefficient v test: %f' % (coefficient_v_test))
+print('Coefficient p test: %f' % (coefficient_p_test))
 
 ##############测试集################
 # filename_test = "F:/code/pycharm/reproductionPINN/export0905.csv"
@@ -870,8 +1031,8 @@ wangge_u_mag = (wangge_u ** 2 + wangge_v ** 2) ** 0.5
 fig = plt.figure(dpi=600,figsize=(9,4))
 ax1= fig.add_subplot(121,aspect='equal')
 ax2= fig.add_subplot(122,aspect='equal')
-U_pred = ax2.scatter(wangge_x,wangge_y, c=u_pred_mag, cmap='rainbow', s=7, marker='s', alpha=0.9, edgecolors='none',vmin=-1,vmax=1, rasterized=True)
-U_true = ax1.scatter(wangge_x,wangge_y, c=wangge_u_mag, cmap='rainbow', s=7, marker='s', alpha=0.9, edgecolors='none',vmin=-1,vmax=1, rasterized=True)
+U_pred = ax2.scatter(wangge_x,wangge_y, c=u_pred_mag, cmap='rainbow', s=7, marker='s', alpha=0.9, edgecolors='none',vmin=0,vmax=1, rasterized=True)
+U_true = ax1.scatter(wangge_x,wangge_y, c=wangge_u_mag, cmap='rainbow', s=7, marker='s', alpha=0.9, edgecolors='none',vmin=0,vmax=1, rasterized=True)
 ax1.set_xticks([])
 ax1.set_yticks([])
 for spine in ax1.spines.values():

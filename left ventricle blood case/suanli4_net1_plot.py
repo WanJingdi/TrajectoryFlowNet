@@ -28,9 +28,11 @@ from torch.utils.data import Dataset, DataLoader, TensorDataset
 import matplotlib.animation as animation
 import scipy.stats as stats
 from matplotlib.patches import Polygon
+import sys
+
 
 os.environ['CUDA_VISIBLE_DEVICES']='1'
-np.random.seed(1234)
+np.random.seed(1547)
 torch.cuda.manual_seed_all(1234)
 torch.manual_seed(1234)
 device = torch.device('cuda')
@@ -86,7 +88,7 @@ class TrajectoryNSNet():
         self.lambda_1 = torch.tensor([0.0], requires_grad=True).to(device)
         self.lambda_1 = nn.Parameter(self.lambda_1)
 
-        self.net_1.load_state_dict(torch.load("suanli4net1nopretrain_all_10x0.01f0.001e_1000it_small.pth"))
+        self.net_1.load_state_dict(torch.load("suanli4net1nopretrain_all_aug_2000.pth"))
 
         self.optimizer = torch.optim.LBFGS(
             self.net_1.parameters(),
@@ -98,6 +100,7 @@ class TrajectoryNSNet():
             tolerance_change=1.0 * np.finfo(float).eps,
             line_search_fn="strong_wolfe"
         )
+
         self.optimizer_Adam = torch.optim.Adam(self.net_1.parameters(), lr=1e-3)
         # self.lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(self.optimizer_Adam, gamma=0.99999996)
         self.iter = 0
@@ -338,8 +341,27 @@ for i in index[:-1]:
 index = np.array(index)
 N_p = int(0.8 * len(index))
 N_p_test = int(0.15 * len(index))
+
+
+all_idx = np.arange(index.shape[0]-1)
 idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-idx_test = np.random.choice(int(np.setdiff1d(index.shape[0]-1, idx_p)), N_p_test, replace=False)
+remaining = np.setdiff1d(all_idx, idx_p)
+
+
+idx_test = np.random.choice(remaining, N_p_test, replace=False)
+
+remaining_idx = np.setdiff1d(np.arange(index.shape[0]-1), idx_p)
+
+idx_p_sort = np.sort(idx_p)
+idx_test_sort = np.sort(idx_test)
+
+leak = list(set(idx_p) & set(idx_test))
+
+if leak:
+    print(f"Leakage detected: {leak}")
+    sys.exit(1)
+
+
 idx_p1 = [i+1 for i in idx_test]
 index_N = index[idx_test]
 delta_index = index[idx_p1] - index_N
@@ -390,9 +412,7 @@ B_gauss_1 = B_data['B1']
 B_gauss_2 = B_data['B2']
 
 layers_1 = [1000 * 2, 40, 40, 40, 40, 2]
-layers_2 = [1000 * 2, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 2]
-
-
+layers_2 = [1000 * 2, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 2]
 
 N_p = len(x_net)
 
@@ -541,6 +561,16 @@ print('Error y: %e' % (error_y))
 # print('Error u: %e' % (error_u))
 # print('Error v: %e' % (error_v))
 # print('Error p: %e' % (error_p))
+x_test_L = x_test * L
+y_test_L = y_test * L
+x_pred_L = x_pred * L
+y_pred_L = y_pred * L
+mae_x = np.mean(np.abs(x_test_L  - x_pred_L))
+mae_y = np.mean(np.abs(y_test_L - y_pred_L))
+
+print('Mean Absolute Error x: %e' % (mae_x))
+print('Mean Absolute Error y: %e' % (mae_y))
+
 x_test_pearsonr = x_test.flatten()
 y_test_pearsonr = y_test.flatten()
 x_pred_pearsonr = x_pred.flatten()
@@ -551,6 +581,10 @@ coefficient_y_test,_ = stats.pearsonr(y_test_pearsonr,y_pred_pearsonr)
 
 print('coefficient x: %e' % (coefficient_x_test))
 print('coefficient y: %e' % (coefficient_y_test))
+
+
+
+
 ############训练集############
 fig = plt.figure(figsize=(50, 50), dpi=600)
 ax = fig.add_subplot(111)
@@ -620,7 +654,7 @@ for i in range(int(len(plot_test_index))):
 #                (x_test[index_plot[50]]-0.04, y_test[index_plot[40]]+0.039))
 handles, labels = plt.gca().get_legend_handles_labels()
 by_label = dict(zip(labels, handles))
-plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
 
 
 #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
@@ -641,15 +675,16 @@ plt.show()
 # NE_y_line = abs(y_pred - y_test)
 # NE_x = np.hstack((t_test,NE_x_line))
 # NE_y = np.hstack((t_test,NE_y_line))
+t_test_plot = t_test  / (U / L)
 NE_x_line_pred = x_pred
 NE_y_line_pred = y_pred
-NE_x_pred = np.hstack((t_test,NE_x_line_pred))
-NE_y_pred = np.hstack((t_test,NE_y_line_pred))
+NE_x_pred = np.hstack((t_test_plot,NE_x_line_pred))
+NE_y_pred = np.hstack((t_test_plot,NE_y_line_pred))
 
 NE_x_line_test = x_test
 NE_y_line_test = y_test
-NE_x_test = np.hstack((t_test,NE_x_line_test))
-NE_y_test = np.hstack((t_test,NE_y_line_test))
+NE_x_test = np.hstack((t_test_plot,NE_x_line_test))
+NE_y_test = np.hstack((t_test_plot,NE_y_line_test))
 
 
 def split_to_columns(data):
@@ -703,6 +738,8 @@ NE_y = split_to_columns(NE_y_pred)
 NT_x = split_to_columns(NE_x_test)
 NT_y = split_to_columns(NE_y_test)
 
+time_stamps = NE_x[:, 0]
+
 diff_x = NE_x - NT_x
 norm_diff_x = nan_norm(diff_x,axis=1)
 norm_test_x = nan_norm(NT_x, axis=1)
@@ -712,11 +749,50 @@ relative_errors_x = relative_errors_x[:,None]
 diff_y = NE_y - NT_y
 norm_diff_y = nan_norm(diff_y,axis=1)
 norm_test_y = nan_norm(NT_y, axis=1)
-relative_errors_y = norm_diff_y / norm_test_x
+relative_errors_y = norm_diff_y / norm_test_y
 relative_errors_y = relative_errors_y[:,None]
 
-relative_errors_xy = np.hstack([relative_errors_x,relative_errors_y])
-np.savetxt('4l2trajectory.csv', relative_errors_xy, fmt='%.18f', delimiter=',', newline='\n')
+
+NE_r = np.sqrt(NE_x**2 + NE_y**2)
+NT_r = np.sqrt(NT_x**2 + NT_y**2)
+
+diff_r = NE_r - NT_r
+norm_diff_r = nan_norm(diff_r, axis=1)
+norm_test_r = nan_norm(NT_r, axis=1)
+relative_errors_r = (norm_diff_r / norm_test_r)[:, None]
+
+relative_errors_xy = np.hstack([time_stamps[:, None], relative_errors_x,relative_errors_y, relative_errors_r])
+np.savetxt('Case4l2trajectory.csv', relative_errors_xy, fmt='%.18f', delimiter=',', newline='\n')
+
+pearson_r_x = np.zeros(NE_x.shape[0])
+pearson_r_y = np.zeros(NE_y.shape[0])
+pearson_r_r = np.zeros(NE_r.shape[0])
+
+for i in range(NE_x.shape[0]):
+    # 过滤掉NaN值
+    valid_mask_x = ~np.isnan(NE_x[i]) & ~np.isnan(NT_x[i])
+    valid_NE_x = NE_x[i][valid_mask_x]
+    valid_NT_x = NT_x[i][valid_mask_x]
+
+    valid_mask_y = ~np.isnan(NE_y[i]) & ~np.isnan(NT_y[i])
+    valid_NE_y = NE_y[i][valid_mask_y]
+    valid_NT_y = NT_y[i][valid_mask_y]
+
+    valid_mask_r = ~np.isnan(NE_r[i]) & ~np.isnan(NT_r[i])
+    valid_NE_r = NE_r[i][valid_mask_r]
+    valid_NT_r = NT_r[i][valid_mask_r]
+
+
+    pearson_r_x[i], _ = stats.pearsonr(valid_NE_x, valid_NT_x)
+    pearson_r_y[i], _ = stats.pearsonr(valid_NE_y, valid_NT_y)
+    pearson_r_r[i], _ = stats.pearsonr(valid_NE_r, valid_NT_r)
+
+
+# 组合并保存结果
+pearson_r_xy = np.hstack([time_stamps[:, None], pearson_r_x[:, None], pearson_r_y[:, None], pearson_r_r[:, None]])
+np.savetxt('Case4_pearson_r_values.csv', pearson_r_xy,
+           fmt='%.18f', delimiter=',', newline='\n',
+           comments='')
 
 # NE_x = NE_x_line[index_plot[0]:index_plot[0]+delta_index[0]]
 # NE_y = NE_y_line[index_plot[0]:index_plot[0]+delta_index[0]]
@@ -826,6 +902,7 @@ ax.set_aspect('equal')
 plt.rcParams['svg.fonttype'] = 'none'
 fig.savefig('4particle test 60 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
+
 
 
 i = 16

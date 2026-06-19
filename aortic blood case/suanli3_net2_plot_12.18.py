@@ -25,8 +25,9 @@ import cv2
 import re
 import matplotlib.colors as mcolors
 import h5py
+import sys
 
-os.environ['CUDA_VISIBLE_DEVICES']='5'
+os.environ['CUDA_VISIBLE_DEVICES']='3'
 np.random.seed(1234)
 torch.cuda.manual_seed_all(1234)
 torch.manual_seed(1234)
@@ -93,7 +94,8 @@ class TrajectoryNSNet():
         )
         self.optimizer_Adam = torch.optim.Adam(self.net_2.parameters(), lr=0.001)
         self.iter = 0
-        self.net_2.load_state_dict(torch.load("suanli3nopretrainnet2.pth"))
+        self.net_2.load_state_dict(torch.load("suanli3net2nopretrain_all_aug_10000.pth"))
+
 
     def net_x_psi_p(self, x, y, t1, B):
         psi_p = self.net_2(x, y, t1, B)
@@ -265,7 +267,7 @@ class TrajectoryNSNet():
             print(step)
             self.optimizer.step(closure=self.closure)#通过梯度下降执行下一步参数更新
         print('End')
-        torch.save(self.net_2.state_dict(), "suanli3net2pretrain_test_FFN_forl1_batch_l1_lbfgs_0.0002_uv_sig.pth")
+        # torch.save(self.net_2.state_dict(), "suanli3net2pretrain_test_FFN_forl1_batch_l1_lbfgs_0.0002_uv_sig.pth")
 
     def predict(self, x_star, y_star, t_star):
         self.x = torch.tensor(x_star, requires_grad=True).float().to(device)
@@ -419,7 +421,7 @@ u_train = u / U
 v_train = v / U
 # p_train = p / (1 * (U ** 2))
 
-##############################################
+#############################################
 
 #############################################
 k = 0
@@ -451,8 +453,26 @@ for i in index[:-1]:
 index = np.array(index)
 N_p = int(0.8 * len(index))
 N_p_test = int(0.15 * len(index))
+
+
+all_idx = np.arange(index.shape[0]-1)
 idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-idx_test = np.random.choice(int(np.setdiff1d(index.shape[0]-1, idx_p)), N_p_test, replace=False)
+remaining = np.setdiff1d(all_idx, idx_p)
+
+
+idx_test = np.random.choice(remaining, N_p_test, replace=False)
+
+remaining_idx = np.setdiff1d(np.arange(index.shape[0]-1), idx_p)
+
+idx_p_sort = np.sort(idx_p)
+idx_test_sort = np.sort(idx_test)
+
+leak = list(set(idx_p) & set(idx_test))
+
+if leak:
+    print(f"Leakage detected: {leak}")
+    sys.exit(1)
+
 idx_p1 = [i+1 for i in idx_test]
 index_N = index[idx_test]
 delta_index = index[idx_p1] - index_N
@@ -510,57 +530,57 @@ y_train_auto = y_auto / L
 t_train_auto = t_auto * (U / L)
 u_train_auto = u_auto / U
 v_train_auto = v_auto / U
-# p_train = p / (1 * (U ** 2))
-extrater = []
-for i in range(len(x_train_auto)):
-    if t_train_auto[i]>0.04:
-        extrater.append(i)
-
-x_train_auto0 = np.delete(x_train_auto, extrater, axis=0)
-y_train_auto0 = np.delete(y_train_auto, extrater, axis=0)
-t_train_auto0 = np.delete(t_train_auto, extrater, axis=0)
-u_train_auto0 = np.delete(u_train_auto, extrater, axis=0)
-v_train_auto0 = np.delete(v_train_auto, extrater, axis=0)
-
-extrater = []
-for i in range(len(x_train_auto)):
-    if t_train_auto[i]<0.04:
-        extrater.append(i)
-
-x_train_auto = np.delete(x_train_auto, extrater, axis=0)
-y_train_auto = np.delete(y_train_auto, extrater, axis=0)
-t_train_auto = np.delete(t_train_auto, extrater, axis=0)
-u_train_auto = np.delete(u_train_auto, extrater, axis=0)
-v_train_auto = np.delete(v_train_auto, extrater, axis=0)
-
-idx_auto0 = np.random.choice(x_train_auto0.shape[0], int(0.35 * len(x_net)), replace=False)
-x0_net_auto0 = x_train_auto0[idx_auto0]
-y0_net_auto0 = y_train_auto0[idx_auto0]
-x_net_auto0 = x_train_auto0[idx_auto0]
-y_net_auto0 = y_train_auto0[idx_auto0]
-t_net_auto0 = t_train_auto0[idx_auto0]
-u_net_auto0 = u_train_auto0[idx_auto0]
-v_net_auto0 = v_train_auto0[idx_auto0]
-
-idx_auto = np.random.choice(x_train_auto.shape[0], int(1 * len(x_net)), replace=False)
-x0_net_auto = x_train_auto[idx_auto]
-y0_net_auto = y_train_auto[idx_auto]
-x_net_auto = x_train_auto[idx_auto]
-y_net_auto = y_train_auto[idx_auto]
-t_net_auto = t_train_auto[idx_auto]
-u_net_auto = u_train_auto[idx_auto]
-v_net_auto = v_train_auto[idx_auto]
-
-x0_net_auto = np.vstack((x0_net_auto0, x0_net_auto))
-y0_net_auto = np.vstack((y0_net_auto0, y0_net_auto))
-x_net_auto = np.vstack((x_net_auto0, x_net_auto))
-y_net_auto = np.vstack((y_net_auto0, y_net_auto))
-t_net_auto = np.vstack((t_net_auto0, t_net_auto))
-u_net_auto = np.vstack((u_net_auto0, u_net_auto))
-v_net_auto = np.vstack((v_net_auto0, v_net_auto))
-
-xxx_neet = x_net
-yyy_neet = y_net
+# # p_train = p / (1 * (U ** 2))
+# extrater = []
+# for i in range(len(x_train_auto)):
+#     if t_train_auto[i]>0.04:
+#         extrater.append(i)
+#
+# x_train_auto0 = np.delete(x_train_auto, extrater, axis=0)
+# y_train_auto0 = np.delete(y_train_auto, extrater, axis=0)
+# t_train_auto0 = np.delete(t_train_auto, extrater, axis=0)
+# u_train_auto0 = np.delete(u_train_auto, extrater, axis=0)
+# v_train_auto0 = np.delete(v_train_auto, extrater, axis=0)
+#
+# extrater = []
+# for i in range(len(x_train_auto)):
+#     if t_train_auto[i]<0.04:
+#         extrater.append(i)
+#
+# x_train_auto = np.delete(x_train_auto, extrater, axis=0)
+# y_train_auto = np.delete(y_train_auto, extrater, axis=0)
+# t_train_auto = np.delete(t_train_auto, extrater, axis=0)
+# u_train_auto = np.delete(u_train_auto, extrater, axis=0)
+# v_train_auto = np.delete(v_train_auto, extrater, axis=0)
+#
+# idx_auto0 = np.random.choice(x_train_auto0.shape[0], int(0.35 * len(x_net)), replace=False)
+# x0_net_auto0 = x_train_auto0[idx_auto0]
+# y0_net_auto0 = y_train_auto0[idx_auto0]
+# x_net_auto0 = x_train_auto0[idx_auto0]
+# y_net_auto0 = y_train_auto0[idx_auto0]
+# t_net_auto0 = t_train_auto0[idx_auto0]
+# u_net_auto0 = u_train_auto0[idx_auto0]
+# v_net_auto0 = v_train_auto0[idx_auto0]
+#
+# idx_auto = np.random.choice(x_train_auto.shape[0], int(1 * len(x_net)), replace=False)
+# x0_net_auto = x_train_auto[idx_auto]
+# y0_net_auto = y_train_auto[idx_auto]
+# x_net_auto = x_train_auto[idx_auto]
+# y_net_auto = y_train_auto[idx_auto]
+# t_net_auto = t_train_auto[idx_auto]
+# u_net_auto = u_train_auto[idx_auto]
+# v_net_auto = v_train_auto[idx_auto]
+#
+# x0_net_auto = np.vstack((x0_net_auto0, x0_net_auto))
+# y0_net_auto = np.vstack((y0_net_auto0, y0_net_auto))
+# x_net_auto = np.vstack((x_net_auto0, x_net_auto))
+# y_net_auto = np.vstack((y_net_auto0, y_net_auto))
+# t_net_auto = np.vstack((t_net_auto0, t_net_auto))
+# u_net_auto = np.vstack((u_net_auto0, u_net_auto))
+# v_net_auto = np.vstack((v_net_auto0, v_net_auto))
+#
+# xxx_neet = x_net
+# yyy_neet = y_net
 
 
 # x0_train = np.vstack((x0_train,x0_net_auto))
@@ -767,14 +787,17 @@ B_gauss_2 = torch.tensor(B_gauss_2).float()
 train_data = addbatch(xyt0_train,xyuv_train, 30000)
 model = TrajectoryNSNet(B_gauss_2)
 
+lambda_1 = (model.lambda_1)
+lambda_1_value = lambda_1.detach().cpu().numpy()
+print('l1')
+print(lambda_1_value)
 
-
-u_pred, v_pred, p_pred = model.predict(x_train, y_train, t_train)
+u_pred, v_pred, p_pred = model.predict(x_train_auto, y_train_auto, t_train_auto)
 lambda_1 = 0.0008 * torch.sigmoid(model.lambda_1)
 lambda_1_value = lambda_1.detach().cpu().numpy()
-
-error_u = np.linalg.norm(u_train - u_pred, 2) / np.linalg.norm(u_train, 2)
-error_v = np.linalg.norm(v_train - v_pred, 2) / np.linalg.norm(v_train, 2)
+print(lambda_1_value)
+error_u = np.linalg.norm(u_train_auto - u_pred, 2) / np.linalg.norm(u_train_auto, 2)
+error_v = np.linalg.norm(v_train_auto - v_pred, 2) / np.linalg.norm(v_train_auto, 2)
 
 
 print('Error u: %e' % (error_u))
@@ -783,8 +806,8 @@ print('l1: %.5f' % (1 / lambda_1_value))
 
 
 
-wangge_u_pearsonr = u_train.flatten()
-wangge_v_pearsonr = v_train.flatten()
+wangge_u_pearsonr = u_train_auto.flatten()
+wangge_v_pearsonr = v_train_auto.flatten()
 u_test_pred_pearsonr = u_pred.flatten()
 v_test_pred_pearsonr = v_pred.flatten()
 
@@ -794,7 +817,7 @@ print('Coefficient u test: %f' % (coefficient_u_test))
 print('Coefficient v test: %f' % (coefficient_v_test))
 
 
-folder_path = '/suanli3_matlab_npz'
+folder_path = '/home/wanjingdi/code/reproductionPINN/suanli3_matlab_npz'
 npz_file = '000025.mat'
 with h5py.File(os.path.join(folder_path, npz_file), 'r') as data_temp:
     y_temp = np.array(data_temp['ymesh']).flatten()[:, None]
@@ -833,7 +856,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
-
+p_pred = p_pred * (1328.4 * (U ** 2))
 
 
 fig = plt.figure(dpi=600,figsize=(5,2))
@@ -937,6 +960,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
+p_pred = p_pred * (1328.4 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_2 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_2 = abs(v_pred - vvv_snap) / vvv_plot_cor
@@ -975,6 +999,32 @@ plt.rcParams['svg.fonttype'] = 'none'
 fig.savefig('3_u_mag_2' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
+fig = plt.figure(dpi=600,figsize=(5,2))
+# ax1= fig.add_subplot(121,aspect='equal')
+ax2= fig.add_subplot(122,aspect='equal')
+U_pred = ax2.scatter(xxx_snap,yyy_snap, c=p_pred, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmin=-600, vmax= 200)
+# U_true = ax1.scatter(xxx_snap,yyy_snap, c=u_mag, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 0.5, vmin=0)
+# ax1.set_xlabel('$x$', size=10)
+# ax2.set_xlabel('$x$', size=10)
+# ax1.set_ylabel('$y$', size=10)
+# ax2.set_ylabel('$y$', size=10)
+ax2.set_title('p true t=2s', fontsize = 10)
+ax2.set_xticks([])
+ax2.set_yticks([])
+for spine in ax2.spines.values():
+    spine.set_visible(False)
+fig.subplots_adjust(hspace=10.0)
+clim = U_pred.get_clim()
+# 创建包含五个刻度位置的数组
+ticks_positions = np.linspace(clim[0], clim[1], 5)
+
+# 添加颜色条，并指定其宽度、长度、刻度位置及格式
+cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
+cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
+plt.rcParams['svg.fonttype'] = 'none'
+fig.savefig('3_p_mag_2' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+plt.show()
+##############################################################################
 npz_file = '000025.mat'
 with h5py.File(os.path.join(folder_path, npz_file), 'r') as data_temp:
     y_temp = np.array(data_temp['ymesh']).flatten()[:, None]
@@ -1013,6 +1063,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
+p_pred = p_pred * (1328.4 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_25 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_25 = abs(v_pred - vvv_snap) / vvv_plot_cor
@@ -1050,6 +1101,34 @@ plt.rcParams['svg.fonttype'] = 'none'
 fig.savefig('3_u_mag_25' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
+
+
+fig = plt.figure(dpi=600,figsize=(5,2))
+# ax1= fig.add_subplot(121,aspect='equal')
+ax2= fig.add_subplot(122,aspect='equal')
+U_pred = ax2.scatter(xxx_snap,yyy_snap, c=p_pred, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmin=-600, vmax= 200)
+# U_true = ax1.scatter(xxx_snap,yyy_snap, c=u_mag, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 0.5, vmin=0)
+# ax1.set_xlabel('$x$', size=10)
+# ax2.set_xlabel('$x$', size=10)
+# ax1.set_ylabel('$y$', size=10)
+# ax2.set_ylabel('$y$', size=10)
+ax2.set_title('p true t=25s', fontsize = 10)
+ax2.set_xticks([])
+ax2.set_yticks([])
+for spine in ax2.spines.values():
+    spine.set_visible(False)
+fig.subplots_adjust(hspace=10.0)
+clim = U_pred.get_clim()
+# 创建包含五个刻度位置的数组
+ticks_positions = np.linspace(clim[0], clim[1], 5)
+
+# 添加颜色条，并指定其宽度、长度、刻度位置及格式
+cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
+cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
+plt.rcParams['svg.fonttype'] = 'none'
+fig.savefig('3_p_mag_25' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+plt.show()
+######################################################################################
 npz_file = '000050.mat'
 with h5py.File(os.path.join(folder_path, npz_file), 'r') as data_temp:
     y_temp = np.array(data_temp['ymesh']).flatten()[:, None]
@@ -1088,6 +1167,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
+p_pred = p_pred * (1328.4 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_50 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_50 = abs(v_pred - vvv_snap) / vvv_plot_cor
@@ -1125,6 +1205,34 @@ plt.rcParams['svg.fonttype'] = 'none'
 fig.savefig('3_u_mag_50' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
+
+fig = plt.figure(dpi=600,figsize=(5,2))
+# ax1= fig.add_subplot(121,aspect='equal')
+ax2= fig.add_subplot(122,aspect='equal')
+U_pred = ax2.scatter(xxx_snap,yyy_snap, c=p_pred, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmin=-600, vmax= 200)
+# U_true = ax1.scatter(xxx_snap,yyy_snap, c=u_mag, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 0.5, vmin=0)
+# ax1.set_xlabel('$x$', size=10)
+# ax2.set_xlabel('$x$', size=10)
+# ax1.set_ylabel('$y$', size=10)
+# ax2.set_ylabel('$y$', size=10)
+ax2.set_title('p true t=50s', fontsize = 10)
+ax2.set_xticks([])
+ax2.set_yticks([])
+for spine in ax2.spines.values():
+    spine.set_visible(False)
+fig.subplots_adjust(hspace=10.0)
+clim = U_pred.get_clim()
+# 创建包含五个刻度位置的数组
+ticks_positions = np.linspace(clim[0], clim[1], 5)
+
+# 添加颜色条，并指定其宽度、长度、刻度位置及格式
+cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
+cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
+plt.rcParams['svg.fonttype'] = 'none'
+fig.savefig('3_p_mag_50' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+plt.show()
+
+######################################
 npz_file = '000040.mat'
 with h5py.File(os.path.join(folder_path, npz_file), 'r') as data_temp:
     y_temp = np.array(data_temp['ymesh']).flatten()[:, None]
@@ -1163,6 +1271,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
+p_pred = p_pred * (1328.4 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_40 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_40 = abs(v_pred - vvv_snap) / vvv_plot_cor
@@ -1198,6 +1307,34 @@ cbar = fig.colorbar(U_true, ax=[ax1, ax2], fraction=0.046, pad=0.04, ticks=ticks
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
 fig.savefig('3_u_mag_40' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+plt.show()
+
+
+
+fig = plt.figure(dpi=600,figsize=(5,2))
+# ax1= fig.add_subplot(121,aspect='equal')
+ax2= fig.add_subplot(122,aspect='equal')
+U_pred = ax2.scatter(xxx_snap,yyy_snap, c=p_pred, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmin=-600, vmax= 200)
+# U_true = ax1.scatter(xxx_snap,yyy_snap, c=u_mag, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 0.5, vmin=0)
+# ax1.set_xlabel('$x$', size=10)
+# ax2.set_xlabel('$x$', size=10)
+# ax1.set_ylabel('$y$', size=10)
+# ax2.set_ylabel('$y$', size=10)
+ax2.set_title('p true t=40s', fontsize = 10)
+ax2.set_xticks([])
+ax2.set_yticks([])
+for spine in ax2.spines.values():
+    spine.set_visible(False)
+fig.subplots_adjust(hspace=10.0)
+clim = U_pred.get_clim()
+# 创建包含五个刻度位置的数组
+ticks_positions = np.linspace(clim[0], clim[1], 5)
+
+# 添加颜色条，并指定其宽度、长度、刻度位置及格式
+cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
+cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
+plt.rcParams['svg.fonttype'] = 'none'
+fig.savefig('3_p_mag_40' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 # fig = plt.figure(figsize=(10,10),dpi = 330 )
 # ax = fig.add_subplot(111)

@@ -20,7 +20,7 @@ from itertools import product, combinations
 import pandas as pd
 from more_itertools import flatten
 from torch.utils.data import Dataset, DataLoader, TensorDataset
-
+import sys
 
 os.environ['CUDA_VISIBLE_DEVICES']='2'
 np.random.seed(1234)
@@ -521,8 +521,26 @@ for i in index[:-1]:
 index = np.array(index)
 N_p = 200
 N_p_test = 100
+
+all_idx = np.arange(index.shape[0]-1)
 idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-idx_test = np.random.choice(int(np.setdiff1d(index.shape[0]-1, idx_p)), N_p_test, replace=False)
+remaining = np.setdiff1d(all_idx, idx_p)
+
+
+idx_test = np.random.choice(remaining, N_p_test, replace=False)
+
+remaining_idx = np.setdiff1d(np.arange(index.shape[0]-1), idx_p)
+
+idx_p_sort = np.sort(idx_p)
+idx_test_sort = np.sort(idx_test)
+
+leak = list(set(idx_p) & set(idx_test))
+
+if leak:
+    print(f"Leakage detected: {leak}")
+    sys.exit(1)
+
+
 idx_p1 = [i+1 for i in idx_p]
 index_N = index[idx_p]
 delta_index = index[idx_p1] - index_N

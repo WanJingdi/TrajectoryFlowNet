@@ -26,11 +26,11 @@ import re
 import matplotlib.colors as mcolors
 import h5py
 
-os.environ['CUDA_VISIBLE_DEVICES']='5'
-np.random.seed(1234)
+os.environ['CUDA_VISIBLE_DEVICES']='1'
+np.random.seed(1547)
 torch.cuda.manual_seed_all(1234)
 torch.manual_seed(1234)
-device = torch.device('cuda')
+device = torch.device('cpu')
 
 # 自定义第二个神经网络
 class Net2(nn.Module):
@@ -93,8 +93,8 @@ class TrajectoryNSNet():
         )
         self.optimizer_Adam = torch.optim.Adam(self.net_2.parameters(), lr=0.001)
         self.iter = 0
-        self.net_2.load_state_dict(torch.load("suanli4net2nopretrain_all_10x0.01f0.001e_1000it_small.pth"))
-
+        # self.net_2.load_state_dict(torch.load("suanli4net2nopretrain_all_10x0.01f0.001e_1000it_small.pth"))
+        self.net_2.load_state_dict(torch.load("suanli4net2nopretrain_all_aug_2000.pth"))
     def net_x_psi_p(self, x, y, t1, B):
         psi_p = self.net_2(x, y, t1, B)
         psi = psi_p[:, 0:1]
@@ -591,7 +591,8 @@ B_data = np.load('suanli4_B.npz')
 B_gauss_1 = B_data['B1']
 B_gauss_2 = B_data['B2']
 layers_1 = [1000 * 2, 40, 40, 40, 40, 2]
-layers_2 = [1000 * 2, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 2]
+layers_2 = [1000 * 2, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 2]
+
 # layers_2 = [500 * 2, 60, 60, 60, 60, 60, 60, 60, 60, 3]
 # p_net = np.array(p_net).flatten()[:, None]
 
@@ -786,12 +787,12 @@ model = TrajectoryNSNet(B_gauss_2)
 
 
 
-u_pred, v_pred, p_pred = model.predict(x_train, y_train, t_train)
+u_pred, v_pred, p_pred = model.predict(x_train_auto, y_train_auto, t_train_auto)
 lambda_1 = 0.0005 * torch.sigmoid(model.lambda_1)
 lambda_1_value = lambda_1.detach().cpu().numpy()
-
-error_u = np.linalg.norm(u_train - u_pred, 2) / np.linalg.norm(u_train, 2)
-error_v = np.linalg.norm(v_train - v_pred, 2) / np.linalg.norm(v_train, 2)
+print(lambda_1_value)
+error_u = np.linalg.norm(u_train_auto - u_pred, 2) / np.linalg.norm(u_train_auto, 2)
+error_v = np.linalg.norm(v_train_auto - v_pred, 2) / np.linalg.norm(v_train_auto, 2)
 
 
 print('Error u: %e' % (error_u))
@@ -800,8 +801,8 @@ print('l1: %.5f' % (1 / lambda_1_value))
 
 
 
-wangge_u_pearsonr = u_train.flatten()
-wangge_v_pearsonr = v_train.flatten()
+wangge_u_pearsonr = u_train_auto.flatten()
+wangge_v_pearsonr = v_train_auto.flatten()
 u_test_pred_pearsonr = u_pred.flatten()
 v_test_pred_pearsonr = v_pred.flatten()
 
@@ -809,7 +810,6 @@ coefficient_u_test ,_= stats.pearsonr(wangge_u_pearsonr,u_test_pred_pearsonr)
 coefficient_v_test,_ = stats.pearsonr(wangge_v_pearsonr,v_test_pred_pearsonr)
 print('Coefficient u test: %f' % (coefficient_u_test))
 print('Coefficient v test: %f' % (coefficient_v_test))
-
 
 
 
@@ -1052,7 +1052,7 @@ print('Coefficient v test: %f' % (coefficient_v_test))
 
 
 # ######################################################################################取1 25 50
-folder_path = '/PostVec'
+folder_path = '/home/wanjingdi/code/reproductionPINN/PostVec'
 npz_file = 'post_vec_000010.mat'
 with h5py.File(os.path.join(folder_path, npz_file), 'r') as data_temp:
     y_temp = np.array(data_temp['ymesh']).flatten()[:, None]
@@ -1095,6 +1095,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
+p_pred = p_pred * (1500 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_10 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_10 = abs(v_pred - vvv_snap) / vvv_plot_cor
@@ -1132,6 +1133,36 @@ plt.rcParams['svg.fonttype'] = 'none'
 fig.savefig('4_u_mag_10' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
+
+
+fig = plt.figure(dpi=600,figsize=(5,2))
+# ax1= fig.add_subplot(121,aspect='equal')
+ax2= fig.add_subplot(122,aspect='equal')
+U_pred = ax2.scatter(xxx_snap,yyy_snap, c=p_pred, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 60, vmin=0)
+# U_true = ax1.scatter(xxx_snap,yyy_snap, c=u_mag, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 0.5, vmin=0)
+# ax1.set_xlabel('$x$', size=10)
+# ax2.set_xlabel('$x$', size=10)
+# ax1.set_ylabel('$y$', size=10)
+# ax2.set_ylabel('$y$', size=10)
+ax2.set_title('p true t=10', fontsize = 10)
+ax2.set_xticks([])
+ax2.set_yticks([])
+for spine in ax2.spines.values():
+    spine.set_visible(False)
+fig.subplots_adjust(hspace=10.0)
+clim = U_pred.get_clim()
+# 创建包含五个刻度位置的数组
+ticks_positions = np.linspace(clim[0], clim[1], 5)
+
+# 添加颜色条，并指定其宽度、长度、刻度位置及格式
+cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
+cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
+plt.rcParams['svg.fonttype'] = 'none'
+fig.savefig('4_p_mag_10' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+plt.show()
+
+
+##########################
 npz_file = 'post_vec_000100.mat'
 with h5py.File(os.path.join(folder_path, npz_file), 'r') as data_temp:
     y_temp = np.array(data_temp['ymesh']).flatten()[:, None]
@@ -1174,6 +1205,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
+p_pred = p_pred * (1500 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_100 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_mag_100 = abs(u_mag_pred - u_mag) / 0.5
@@ -1210,6 +1242,34 @@ plt.rcParams['svg.fonttype'] = 'none'
 fig.savefig('4_u_mag_100' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
+fig = plt.figure(dpi=600,figsize=(5,2))
+# ax1= fig.add_subplot(121,aspect='equal')
+ax2= fig.add_subplot(122,aspect='equal')
+U_pred = ax2.scatter(xxx_snap,yyy_snap, c=p_pred, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 60, vmin=0)
+# U_true = ax1.scatter(xxx_snap,yyy_snap, c=u_mag, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 0.5, vmin=0)
+# ax1.set_xlabel('$x$', size=10)
+# ax2.set_xlabel('$x$', size=10)
+# ax1.set_ylabel('$y$', size=10)
+# ax2.set_ylabel('$y$', size=10)
+ax2.set_title('p true t=100', fontsize = 10)
+ax2.set_xticks([])
+ax2.set_yticks([])
+for spine in ax2.spines.values():
+    spine.set_visible(False)
+fig.subplots_adjust(hspace=10.0)
+clim = U_pred.get_clim()
+# 创建包含五个刻度位置的数组
+ticks_positions = np.linspace(clim[0], clim[1], 5)
+
+# 添加颜色条，并指定其宽度、长度、刻度位置及格式
+cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
+cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
+plt.rcParams['svg.fonttype'] = 'none'
+fig.savefig('4_p_mag_100' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+plt.show()
+
+
+########################################################
 npz_file = 'post_vec_000190.mat'
 with h5py.File(os.path.join(folder_path, npz_file), 'r') as data_temp:
     y_temp = np.array(data_temp['ymesh']).flatten()[:, None]
@@ -1252,6 +1312,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
+p_pred = p_pred * (1500 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_190 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_190 = abs(v_pred - vvv_snap) / vvv_plot_cor
@@ -1290,6 +1351,32 @@ fig.savefig('4_u_mag_190' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1
 
 plt.show()
 
+fig = plt.figure(dpi=600,figsize=(5,2))
+# ax1= fig.add_subplot(121,aspect='equal')
+ax2= fig.add_subplot(122,aspect='equal')
+U_pred = ax2.scatter(xxx_snap,yyy_snap, c=p_pred, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 60, vmin=0)
+# U_true = ax1.scatter(xxx_snap,yyy_snap, c=u_mag, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 0.5, vmin=0)
+# ax1.set_xlabel('$x$', size=10)
+# ax2.set_xlabel('$x$', size=10)
+# ax1.set_ylabel('$y$', size=10)
+# ax2.set_ylabel('$y$', size=10)
+ax2.set_title('p true t=190', fontsize = 10)
+ax2.set_xticks([])
+ax2.set_yticks([])
+for spine in ax2.spines.values():
+    spine.set_visible(False)
+fig.subplots_adjust(hspace=10.0)
+clim = U_pred.get_clim()
+# 创建包含五个刻度位置的数组
+ticks_positions = np.linspace(clim[0], clim[1], 5)
+
+# 添加颜色条，并指定其宽度、长度、刻度位置及格式
+cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
+cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
+plt.rcParams['svg.fonttype'] = 'none'
+fig.savefig('4_p_mag_190' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+plt.show()
+#########################
 npz_file = 'post_vec_000120.mat'
 with h5py.File(os.path.join(folder_path, npz_file), 'r') as data_temp:
     y_temp = np.array(data_temp['ymesh']).flatten()[:, None]
@@ -1332,6 +1419,7 @@ yyy_snap = np.array(yyy_snap).flatten()[:, None]
 u_pred, v_pred, p_pred = model.predict(xxx_snap, yyy_snap, ttt_snap)
 u_pred = u_pred * U
 v_pred = v_pred * U
+p_pred = p_pred * (1500 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_120 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_120 = abs(v_pred - vvv_snap) / vvv_plot_cor
@@ -1370,4 +1458,30 @@ fig.savefig('4_u_mag_120' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1
 
 plt.show()
 
+
+fig = plt.figure(dpi=600,figsize=(5,2))
+# ax1= fig.add_subplot(121,aspect='equal')
+ax2= fig.add_subplot(122,aspect='equal')
+U_pred = ax2.scatter(xxx_snap,yyy_snap, c=p_pred, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 60, vmin=0)
+# U_true = ax1.scatter(xxx_snap,yyy_snap, c=u_mag, cmap='rainbow', s=1, marker=',', alpha=0.9, edgecolors='none', rasterized=True, vmax= 0.5, vmin=0)
+# ax1.set_xlabel('$x$', size=10)
+# ax2.set_xlabel('$x$', size=10)
+# ax1.set_ylabel('$y$', size=10)
+# ax2.set_ylabel('$y$', size=10)
+ax2.set_title('p true t=120', fontsize = 10)
+ax2.set_xticks([])
+ax2.set_yticks([])
+for spine in ax2.spines.values():
+    spine.set_visible(False)
+fig.subplots_adjust(hspace=10.0)
+clim = U_pred.get_clim()
+# 创建包含五个刻度位置的数组
+ticks_positions = np.linspace(clim[0], clim[1], 5)
+
+# 添加颜色条，并指定其宽度、长度、刻度位置及格式
+cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
+cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
+plt.rcParams['svg.fonttype'] = 'none'
+fig.savefig('4_p_mag_120' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+plt.show()
 ##############################################################################################
