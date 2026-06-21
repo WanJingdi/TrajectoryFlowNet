@@ -410,51 +410,18 @@ def input_mapping(x, B):
 
 np.set_printoptions(precision=20)
 
+data_train = np.load('train_data.npy')
+
+x0_train = data_train[:,0][:, None]
+y0_train = data_train[:,1][:, None]
+t0_train = data_train[:,2][:, None]
+x_net = data_train[:,3][:, None]
+y_net = data_train[:,4][:, None]
+t_net = data_train[:,5][:, None]
+u_net = data_train[:,6][:, None]
+v_net = data_train[:,7][:, None]
 
 
-filename = "Velocitysuanliheart.csv"
-
-x_Matrix = pd.read_csv(filename, header=0)
-train_data = np.array(x_Matrix)
-
-#print('从fluent导出的训练数据为：')
-# train_data = np.delete(train_data, 2, axis=1)
-# train_data = np.delete(train_data, 4, axis=1)
-# train_data = np.delete(train_data, 0, axis=0)
-train_data = train_data.astype(float)
-np.set_printoptions(suppress=True)
-#print(train_data_test)
-# index = np.argwhere(train_data[:, 3:4] == 0.500999987 or train_data[:, 3:4] == 0.550999999 or train_data[:, 3:4] == 0.550999999)[:, 0:1].flatten()
-# N_p = 500
-# idx_p = np.random.choice(index.shape[0], N_p, replace=False)
-# index = index[idx_p]
-
-id = train_data[:, 0:1]
-x = train_data[:, 4:5]
-y = train_data[:, 5:6]
-t = train_data[:, 1:2]
-u = train_data[:, 2:3]
-v = train_data[:, 3:4]
-
-def find_diff_positions(arr):
-    diff_positions = []
-    diff_positions.append(0)
-    for i in range(1, len(arr)):
-        if arr[i] - arr[i-1] != 0:
-            diff_positions.append(i)
-    return diff_positions
-index = find_diff_positions(id)
-index.append(int(len(id)))
-
-y_max = max(y)
-y = y_max-y
-v = - v
-
-x = 0.05 * 0.001 * x
-y = 0.05 * 0.001 * y
-t = 0.005  * t
-u = ((0.05 * 0.001)/(0.005)) * u
-v = ((0.05 * 0.001)/(0.005)) * v
 
 ########################################
 data_auto = np.load('suanli4_wang_new.npz')
@@ -474,147 +441,9 @@ t_auto = np.array(t_auto).flatten()[:, None]
 u_auto = np.array(u_auto).flatten()[:, None]
 v_auto = np.array(v_auto).flatten()[:, None]
 
+L = 0.0720799771312063
+U = 0.9368397326288259
 
-
-x_ab = max(abs(x))
-y_ab = max(abs(y))
-L = float(max(x_ab, y_ab))
-u_ab = max(abs(u))
-v_ab = max(abs(v))
-U = float(max(u_ab, v_ab))
-
-
-x_ab_auto = max(abs(x_auto))
-y_ab_auto = max(abs(y_auto))
-L_auto = float(max(x_ab_auto, y_ab_auto))
-u_ab_auto = max(abs(u_auto))
-v_ab_auto = max(abs(v_auto))
-U_auto = float(max(u_ab_auto, v_ab_auto))
-
-
-L = float(max(L, L_auto))
-U = float(max(U, U_auto))
-# U = 1
-# L = 0.01
-x_train = x / L
-y_train = y / L
-t_train = t * (U / L)
-u_train = u / U
-v_train = v / U
-
-k = 0
-x00_train = []
-y00_train = []
-t00_train = []
-x0_train = []
-y0_train = []
-t0_train = []
-x_net =[]
-y_net =[]
-t_net =[]
-u_net =[]
-v_net =[]
-# p_net =[]
-# par_num = []
-# delta_i = 1400
-
-for i in index[:-1]:
-    x0 = x_train[i]
-    y0 = y_train[i]
-    t0 = t_train[i]
-    delta_i = index[k+1] - index[k]
-    k = k+1
-    for j in range(delta_i):
-        x00_train.append(x0)
-        y00_train.append(y0)
-        t00_train.append(t0)
-
-# for i in index:
-index = np.array(index)
-# for i in index:
-index = np.array(index)
-N_p = int(0.8 * len(index))
-N_p_test = int(0.15 * len(index))
-
-
-all_idx = np.arange(index.shape[0]-1)
-idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-remaining = np.setdiff1d(all_idx, idx_p)
-
-
-idx_test = np.random.choice(remaining, N_p_test, replace=False)
-
-remaining_idx = np.setdiff1d(np.arange(index.shape[0]-1), idx_p)
-
-idx_p_sort = np.sort(idx_p)
-idx_test_sort = np.sort(idx_test)
-
-leak = list(set(idx_p) & set(idx_test))
-
-if leak:
-    print(f"Leakage detected: {leak}")
-    sys.exit(1)
-
-
-idx_p1 = [i+1 for i in idx_p]
-index_N = index[idx_p]
-delta_index = index[idx_p1] - index_N
-
-delta_index_sort = np.sort(delta_index)
-
-for i in range(int(len(index_N))):
-    x0_train.append(x00_train[index_N[i]:index_N[i]+delta_index[i]])
-    y0_train.append(y00_train[index_N[i]:index_N[i]+delta_index[i]])
-    t0_train.append(t00_train[index_N[i]:index_N[i] + delta_index[i]])
-    x_net.append(x_train[index_N[i]:index_N[i]+delta_index[i]])
-    y_net.append(y_train[index_N[i]:index_N[i]+delta_index[i]])
-    t_net.append(t_train[index_N[i]:index_N[i]+delta_index[i]])
-    u_net.append(u_train[index_N[i]:index_N[i]+delta_index[i]])
-    v_net.append(v_train[index_N[i]:index_N[i]+delta_index[i]])
-    # p_net.append(p_train[index_N[i]:index_N[i]+delta_index[i]])
-
-# x_in = x_train
-# y_in = y_train
-# t_in = t_train
-# u_in = u_train
-# v_in = v_train
-# p_in = p_train
-# x_net.append(x_in)
-# y_net.append(y_in)
-# t_net.append(t_in)
-# u_net.append(u_in)
-# v_net.append(v_in)
-# p_net.append(p_in)
-x0_train = list(flatten(x0_train))
-y0_train = list(flatten(y0_train))
-t0_train = list(flatten(t0_train))
-x_net = list(flatten(x_net))
-y_net = list(flatten(y_net))
-u_net = list(flatten(u_net))
-v_net = list(flatten(v_net))
-# p_net = list(flatten(p_net))
-t_net = list(flatten(t_net))
-
-x0_train = np.array(x0_train).flatten()[:, None]
-y0_train = np.array(y0_train).flatten()[:, None]
-t0_train = np.array(t0_train).flatten()[:, None]
-x_net = np.array(x_net).flatten()[:, None]
-y_net = np.array(y_net).flatten()[:, None]
-t_net = np.array(t_net).flatten()[:, None]
-u_net = np.array(u_net).flatten()[:, None]
-v_net = np.array(v_net).flatten()[:, None]
-
-
-fig = plt.figure(figsize=(9, 6), dpi=300)
-ax = fig.add_subplot(111)
-
-plt.scatter(x_net,y_net, c = t_net / (U / L),s =2, marker="o")
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.tick_params(labelsize=15)
-plt.colorbar()
-plt.axis('equal')
-plt.show()
 
 
 # U = 1

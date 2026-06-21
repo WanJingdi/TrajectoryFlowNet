@@ -315,50 +315,21 @@ def addbatch(data_train,data_test,batchsize):
 
 np.set_printoptions(precision=20)
 
+data_train = np.load('test_data.npy')
 
-filename = "Velocitysuanliheart.csv"
+x0_train = data_train[:,0][:, None]
+y0_train = data_train[:,1][:, None]
+t0_train = data_train[:,2][:, None]
+x_net = data_train[:,3][:, None]
+y_net = data_train[:,4][:, None]
+t_net = data_train[:,5][:, None]
+u_net = data_train[:,6][:, None]
+v_net = data_train[:,7][:, None]
 
-x_Matrix = pd.read_csv(filename, header=0)
-train_data = np.array(x_Matrix)
+delta_index = np.load('test_delta_index.npy')
+L = 0.0720799771312063
+U = 0.9368397326288259
 
-#print('从fluent导出的训练数据为：')
-# train_data = np.delete(train_data, 2, axis=1)
-# train_data = np.delete(train_data, 4, axis=1)
-# train_data = np.delete(train_data, 0, axis=0)
-train_data = train_data.astype(float)
-np.set_printoptions(suppress=True)
-#print(train_data_test)
-# index = np.argwhere(train_data[:, 3:4] == 0.500999987 or train_data[:, 3:4] == 0.550999999 or train_data[:, 3:4] == 0.550999999)[:, 0:1].flatten()
-# N_p = 500
-# idx_p = np.random.choice(index.shape[0], N_p, replace=False)
-# index = index[idx_p]
-
-id = train_data[:, 0:1]
-x = train_data[:, 4:5]
-y = train_data[:, 5:6]
-t = train_data[:, 1:2]
-u = train_data[:, 2:3]
-v = train_data[:, 3:4]
-
-def find_diff_positions(arr):
-    diff_positions = []
-    diff_positions.append(0)
-    for i in range(1, len(arr)):
-        if arr[i] - arr[i-1] != 0:
-            diff_positions.append(i)
-    return diff_positions
-index = find_diff_positions(id)
-index.append(int(len(id)))
-
-y_max = max(y)
-y = y_max-y
-v = - v
-
-x = 0.05 * 0.001 * x
-y = 0.05 * 0.001 * y
-t = 0.005  * t
-u = ((0.05 * 0.001)/(0.005)) * u
-v = ((0.05 * 0.001)/(0.005)) * v
 #####################自动追踪粒子#############################
 
 
@@ -380,133 +351,20 @@ u_auto = np.array(u_auto).flatten()[:, None]
 v_auto = np.array(v_auto).flatten()[:, None]
 #################################################################
 
-
-x_ab = max(abs(x))
-y_ab = max(abs(y))
-L = float(max(x_ab, y_ab))
-u_ab = max(abs(u))
-v_ab = max(abs(v))
-U = float(max(u_ab, v_ab))
-
-
-x_ab_auto = max(abs(x_auto))
-y_ab_auto = max(abs(y_auto))
-L_auto = float(max(x_ab_auto, y_ab_auto))
-u_ab_auto = max(abs(u_auto))
-v_ab_auto = max(abs(v_auto))
-U_auto = float(max(u_ab_auto, v_ab_auto))
-
-
-L = float(max(L, L_auto))
-U = float(max(U, U_auto))
-
-u_plot_max = max(u)
-u_plot_min = min(u)
-v_plot_max = max(v)
-v_plot_min = min(v)
 u_plot_auto_max = max(u_auto)
 u_plot_auto_min = min(u_auto)
 v_plot_auto_max = max(v_auto)
 v_plot_auto_min = min(v_auto)
 
-uuu_plot_max = float(max(u_plot_max, u_plot_auto_max))
-uuu_plot_min = float(min(u_plot_min, u_plot_auto_min))
-vvv_plot_max = float(max(v_plot_max, v_plot_auto_max))
-vvv_plot_min = float(min(v_plot_min, v_plot_auto_min))
+uuu_plot_max = u_plot_auto_max
+uuu_plot_min = u_plot_auto_min
+vvv_plot_max = v_plot_auto_max
+vvv_plot_min = v_plot_auto_min
 
 uuu_plot_cor = uuu_plot_max - uuu_plot_min
 vvv_plot_cor = vvv_plot_max - vvv_plot_min
-# U = 1
-# L = 0.01
-x_train = x / L
-y_train = y / L
-t_train = t * (U / L)
-u_train = u / U
-v_train = v / U
-# p_train = p / (1 * (U ** 2))
 
 ##############################################
-
-#############################################
-k = 0
-x00_train = []
-y00_train = []
-x0_train = []
-y0_train = []
-x_net =[]
-y_net =[]
-t_net =[]
-u_net =[]
-v_net =[]
-# p_net =[]
-# par_num = []
-# delta_i = 1400
-
-for i in index[:-1]:
-    x0 = x_train[i]
-    y0 = y_train[i]
-    delta_i = index[k+1] - index[k]
-    k = k+1
-    for j in range(delta_i):
-        x00_train.append(x0)
-        y00_train.append(y0)
-
-# k = 0
-
-# for i in index:
-index = np.array(index)
-N_p = int(0.8 * len(index))
-N_p_test = int(0.15 * len(index))
-idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-idx_test = np.random.choice(int(np.setdiff1d(index.shape[0]-1, idx_p)), N_p_test, replace=False)
-idx_p1 = [i+1 for i in idx_test]
-index_N = index[idx_test]
-delta_index = index[idx_p1] - index_N
-for i in range(int(len(index_N))):
-    x0_train.append(x00_train[index_N[i]:index_N[i]+delta_index[i]])
-    y0_train.append(y00_train[index_N[i]:index_N[i]+delta_index[i]])
-    x_net.append(x_train[index_N[i]:index_N[i]+delta_index[i]])
-    y_net.append(y_train[index_N[i]:index_N[i]+delta_index[i]])
-    t_net.append(t_train[index_N[i]:index_N[i]+delta_index[i]])
-    u_net.append(u_train[index_N[i]:index_N[i]+delta_index[i]])
-    v_net.append(v_train[index_N[i]:index_N[i]+delta_index[i]])
-    # p_net.append(p_train[index_N[i]:index_N[i]+delta_index[i]])
-
-# x_in = x_train
-# y_in = y_train
-# t_in = t_train
-# u_in = u_train
-# v_in = v_train
-# p_in = p_train
-# x_net.append(x_in)
-# y_net.append(y_in)
-# t_net.append(t_in)
-# u_net.append(u_in)
-# v_net.append(v_in)
-# p_net.append(p_in)
-x0_train = list(flatten(x0_train))
-y0_train = list(flatten(y0_train))
-x_net = list(flatten(x_net))
-y_net = list(flatten(y_net))
-u_net = list(flatten(u_net))
-v_net = list(flatten(v_net))
-# p_net = list(flatten(p_net))
-t_net = list(flatten(t_net))
-
-x0_train = np.array(x0_train).flatten()[:, None]
-y0_train = np.array(y0_train).flatten()[:, None]
-x_net = np.array(x_net).flatten()[:, None]
-y_net = np.array(y_net).flatten()[:, None]
-t_net = np.array(t_net).flatten()[:, None]
-u_net = np.array(u_net).flatten()[:, None]
-v_net = np.array(v_net).flatten()[:, None]
-
-
-
-
-
-
-
 
 
 # U = 1
@@ -1100,7 +958,7 @@ u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_10 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_10 = abs(v_pred - vvv_snap) / vvv_plot_cor
 NE_mag_10 = abs(u_mag_pred - u_mag) / 0.5
-np.savetxt('4NE_mag_10.csv', NE_mag_10, fmt='%.18f', delimiter=',', newline='\n')
+np.savetxt('4NE_mag_10_large.csv', NE_mag_10, fmt='%.18f', delimiter=',', newline='\n')
 
 fig = plt.figure(dpi=600,figsize=(5,2))
 ax1= fig.add_subplot(121,aspect='equal')
@@ -1130,7 +988,7 @@ ticks_positions = np.linspace(clim[0], clim[1], 5)
 cbar = fig.colorbar(U_true, ax=[ax1, ax2], fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_u_mag_10' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_u_mag_10_large' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
 
@@ -1158,7 +1016,7 @@ ticks_positions = np.linspace(clim[0], clim[1], 5)
 cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_p_mag_10' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_p_mag_10_large' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
 
@@ -1209,7 +1067,7 @@ p_pred = p_pred * (1500 * (U ** 2))
 u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_100 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_mag_100 = abs(u_mag_pred - u_mag) / 0.5
-np.savetxt('4NE_mag_100.csv', NE_mag_100, fmt='%.18f', delimiter=',', newline='\n')
+np.savetxt('4NE_mag_100_large.csv', NE_mag_100, fmt='%.18f', delimiter=',', newline='\n')
 
 fig = plt.figure(dpi=600,figsize=(5,2))
 ax1= fig.add_subplot(121,aspect='equal')
@@ -1239,7 +1097,7 @@ ticks_positions = np.linspace(clim[0], clim[1], 5)
 cbar = fig.colorbar(U_true, ax=[ax1, ax2], fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_u_mag_100' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_u_mag_100_large' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
 fig = plt.figure(dpi=600,figsize=(5,2))
@@ -1265,7 +1123,7 @@ ticks_positions = np.linspace(clim[0], clim[1], 5)
 cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_p_mag_100' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_p_mag_100_large' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
 
@@ -1317,7 +1175,7 @@ u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_190 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_190 = abs(v_pred - vvv_snap) / vvv_plot_cor
 NE_mag_190 = abs(u_mag_pred - u_mag) / 0.5
-np.savetxt('4NE_mag_190.csv', NE_mag_190, fmt='%.18f', delimiter=',', newline='\n')
+np.savetxt('4NE_mag_190_large.csv', NE_mag_190, fmt='%.18f', delimiter=',', newline='\n')
 
 fig = plt.figure(dpi=600,figsize=(5,2))
 ax1= fig.add_subplot(121,aspect='equal')
@@ -1347,7 +1205,7 @@ ticks_positions = np.linspace(clim[0], clim[1], 5)
 cbar = fig.colorbar(U_true, ax=[ax1, ax2], fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_u_mag_190' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_u_mag_190_large' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 
 plt.show()
 
@@ -1374,7 +1232,7 @@ ticks_positions = np.linspace(clim[0], clim[1], 5)
 cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_p_mag_190' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_p_mag_190_large' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 #########################
 npz_file = 'post_vec_000120.mat'
@@ -1424,7 +1282,7 @@ u_mag_pred = (u_pred ** 2 + v_pred ** 2) ** 0.5
 NE_u_120 = abs(u_pred - uuu_snap) / uuu_plot_cor
 NE_v_120 = abs(v_pred - vvv_snap) / vvv_plot_cor
 NE_mag_120 = abs(u_mag_pred - u_mag) / 0.5
-np.savetxt('4NE_mag_120.csv', NE_mag_120, fmt='%.18f', delimiter=',', newline='\n')
+np.savetxt('4NE_mag_120_large.csv', NE_mag_120, fmt='%.18f', delimiter=',', newline='\n')
 
 fig = plt.figure(dpi=600,figsize=(5,2))
 ax1= fig.add_subplot(121,aspect='equal')
@@ -1454,7 +1312,7 @@ ticks_positions = np.linspace(clim[0], clim[1], 5)
 cbar = fig.colorbar(U_true, ax=[ax1, ax2], fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_u_mag_120' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_u_mag_120_large' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 
 plt.show()
 
@@ -1482,6 +1340,6 @@ ticks_positions = np.linspace(clim[0], clim[1], 5)
 cbar = fig.colorbar(U_pred, ax=ax2, fraction=0.046, pad=0.04, ticks=ticks_positions, format='%.2f')
 cbar.ax.tick_params(labelsize=8)  # 设置刻度标签字体大小
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_p_mag_120' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_p_mag_120_large' + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 ##############################################################################################

@@ -217,195 +217,18 @@ def input_mapping(x, B):
 np.set_printoptions(precision=20)
 
 
-# layers_2 = [3, 60, 60, 60, 60, 60, 60, 2]
-# Load Data
+data_train = np.load('test_data.npy')
 
-filename = "Velocitysuanliheart.csv"
+x0_train = data_train[:,0][:, None]
+y0_train = data_train[:,1][:, None]
+t0_train = data_train[:,2][:, None]
+x_net = data_train[:,3][:, None]
+y_net = data_train[:,4][:, None]
+t_net = data_train[:,5][:, None]
+u_net = data_train[:,6][:, None]
+v_net = data_train[:,7][:, None]
 
-x_Matrix = pd.read_csv(filename, header=0)
-train_data = np.array(x_Matrix)
-
-#print('从fluent导出的训练数据为：')
-# train_data = np.delete(train_data, 2, axis=1)
-# train_data = np.delete(train_data, 4, axis=1)
-# train_data = np.delete(train_data, 0, axis=0)
-train_data = train_data.astype(float)
-np.set_printoptions(suppress=True)
-#print(train_data_test)
-# index = np.argwhere(train_data[:, 3:4] == 0.500999987 or train_data[:, 3:4] == 0.550999999 or train_data[:, 3:4] == 0.550999999)[:, 0:1].flatten()
-# N_p = 500
-# idx_p = np.random.choice(index.shape[0], N_p, replace=False)
-# index = index[idx_p]
-
-id = train_data[:, 0:1]
-x = train_data[:, 4:5]
-y = train_data[:, 5:6]
-t = train_data[:, 1:2]
-u = train_data[:, 2:3]
-v = train_data[:, 3:4]
-
-def find_diff_positions(arr):
-    diff_positions = []
-    diff_positions.append(0)
-    for i in range(1, len(arr)):
-        if arr[i] - arr[i-1] != 0:
-            diff_positions.append(i)
-    return diff_positions
-index = find_diff_positions(id)
-index.append(int(len(id)))
-
-y_max = max(y)
-y = y_max-y
-v = - v
-
-x = 0.05 * 0.001 * x
-y = 0.05 * 0.001 * y
-t = 0.005  * t
-u = ((0.05 * 0.001)/(0.005)) * u
-v = ((0.05 * 0.001)/(0.005)) * v
-
-########################################
-data_auto = np.load('suanli4_wang_new.npz')
-
-# 访问保存的数组
-x_auto = data_auto['x']
-y_auto = data_auto['y']
-t_auto = data_auto['t']
-u_auto = data_auto['u']
-v_auto = data_auto['v']
-y_auto_max = max(y_auto)
-x_auto = [i+0.0469760 for i in x_auto]
-y_auto = [i+0.0118951 for i in y_auto]
-x_auto = np.array(x_auto).flatten()[:, None]
-y_auto = np.array(y_auto).flatten()[:, None]
-t_auto = np.array(t_auto).flatten()[:, None]
-u_auto = np.array(u_auto).flatten()[:, None]
-v_auto = np.array(v_auto).flatten()[:, None]
-
-
-
-x_ab = max(abs(x))
-y_ab = max(abs(y))
-L = float(max(x_ab, y_ab))
-u_ab = max(abs(u))
-v_ab = max(abs(v))
-U = float(max(u_ab, v_ab))
-
-
-x_ab_auto = max(abs(x_auto))
-y_ab_auto = max(abs(y_auto))
-L_auto = float(max(x_ab_auto, y_ab_auto))
-u_ab_auto = max(abs(u_auto))
-v_ab_auto = max(abs(v_auto))
-U_auto = float(max(u_ab_auto, v_ab_auto))
-
-
-L = float(max(L, L_auto))
-U = float(max(U, U_auto))
-# U = 1
-# L = 0.01
-x_train = x / L
-y_train = y / L
-t_train = t * (U / L)
-u_train = u / U
-v_train = v / U
-
-k = 0
-x00_train = []
-y00_train = []
-t00_train = []
-x0_train = []
-y0_train = []
-t0_train = []
-x_net =[]
-y_net =[]
-t_net =[]
-u_net =[]
-v_net =[]
-# p_net =[]
-# par_num = []
-# delta_i = 1400
-
-for i in index[:-1]:
-    x0 = x_train[i]
-    y0 = y_train[i]
-    t0 = t_train[i]
-    delta_i = index[k+1] - index[k]
-    k = k+1
-    for j in range(delta_i):
-        x00_train.append(x0)
-        y00_train.append(y0)
-        t00_train.append(t0)
-
-# for i in index:
-index = np.array(index)
-N_p = int(0.8 * len(index))
-N_p_test = int(0.15 * len(index))
-
-
-all_idx = np.arange(index.shape[0]-1)
-idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-remaining = np.setdiff1d(all_idx, idx_p)
-
-
-idx_test = np.random.choice(remaining, N_p_test, replace=False)
-
-remaining_idx = np.setdiff1d(np.arange(index.shape[0]-1), idx_p)
-
-idx_p_sort = np.sort(idx_p)
-idx_test_sort = np.sort(idx_test)
-
-leak = list(set(idx_p) & set(idx_test))
-
-if leak:
-    print(f"Leakage detected: {leak}")
-    sys.exit(1)
-
-
-idx_p1 = [i+1 for i in idx_test]
-index_N = index[idx_test]
-delta_index = index[idx_p1] - index_N
-for i in range(int(len(index_N))):
-    x0_train.append(x00_train[index_N[i]:index_N[i]+delta_index[i]])
-    y0_train.append(y00_train[index_N[i]:index_N[i]+delta_index[i]])
-    t0_train.append(t00_train[index_N[i]:index_N[i] + delta_index[i]])
-    x_net.append(x_train[index_N[i]:index_N[i]+delta_index[i]])
-    y_net.append(y_train[index_N[i]:index_N[i]+delta_index[i]])
-    t_net.append(t_train[index_N[i]:index_N[i]+delta_index[i]])
-    u_net.append(u_train[index_N[i]:index_N[i]+delta_index[i]])
-    v_net.append(v_train[index_N[i]:index_N[i]+delta_index[i]])
-    # p_net.append(p_train[index_N[i]:index_N[i]+delta_index[i]])
-
-# x_in = x_train
-# y_in = y_train
-# t_in = t_train
-# u_in = u_train
-# v_in = v_train
-# p_in = p_train
-# x_net.append(x_in)
-# y_net.append(y_in)
-# t_net.append(t_in)
-# u_net.append(u_in)
-# v_net.append(v_in)
-# p_net.append(p_in)
-x0_train = list(flatten(x0_train))
-y0_train = list(flatten(y0_train))
-t0_train = list(flatten(t0_train))
-x_net = list(flatten(x_net))
-y_net = list(flatten(y_net))
-u_net = list(flatten(u_net))
-v_net = list(flatten(v_net))
-# p_net = list(flatten(p_net))
-t_net = list(flatten(t_net))
-
-x0_train = np.array(x0_train).flatten()[:, None]
-y0_train = np.array(y0_train).flatten()[:, None]
-t0_train = np.array(t0_train).flatten()[:, None]
-x_net = np.array(x_net).flatten()[:, None]
-y_net = np.array(y_net).flatten()[:, None]
-t_net = np.array(t_net).flatten()[:, None]
-u_net = np.array(u_net).flatten()[:, None]
-v_net = np.array(v_net).flatten()[:, None]
+delta_index = np.load('test_delta_index.npy')
 
 B_data = np.load('suanli4_B.npz')
 B_gauss_1 = B_data['B1']
@@ -413,6 +236,9 @@ B_gauss_2 = B_data['B2']
 
 layers_1 = [1000 * 2, 40, 40, 40, 40, 2]
 layers_2 = [1000 * 2, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 2]
+
+L = 0.0720799771312063
+U = 0.9368397326288259
 
 N_p = len(x_net)
 
@@ -586,22 +412,12 @@ print('coefficient y: %e' % (coefficient_y_test))
 
 
 ############训练集############
-fig = plt.figure(figsize=(50, 50), dpi=600)
-ax = fig.add_subplot(111)
-plt.rcParams['svg.fonttype'] = 'none'
-plt.scatter(x_test,y_test,s =1, marker="^",c='r')
-plt.scatter(x_pred,y_pred,s =1, marker="^",c='b')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=20)
-ax.set_ylabel('$y$', size=20)
-ax.set_title('particle test', fontsize = 20)
-plt.axis('equal')
-plt.show()
+
+index_plot = np.zeros(len(delta_index), dtype=int)
+for i in range(1, len(delta_index)):
+    index_plot[i] = index_plot[i-1] + delta_index[i-1]
 
 
-index_plot = np.cumsum(delta_index)
-index_plot = np.append(0, index_plot)
-index_plot = index_plot[:-1]
 fig = plt.figure(figsize=(6, 3), dpi=300)
 ax = fig.add_subplot(111)
 # plt.tick_params(direction='in')
@@ -610,6 +426,7 @@ ax = fig.add_subplot(111)
 # ax.add_patch(poly)
 # circle = plt.Circle((0.05/L, 0.05/L), 0.01/L, color='black', fill=False)
 # plt.gca().add_patch(circle)
+
 
 def annotate_point(label, x, y, xytext_offset):
     ax.annotate(
@@ -624,7 +441,7 @@ def annotate_point(label, x, y, xytext_offset):
         ),
         fontsize=2,
     )
-plot_test_index = np.random.choice(98, 98, replace=False)
+plot_test_index = np.arange(len(delta_index))
 # plot_test_index = plot_test_index[plot_test_index != 160]
 # plot_test_index = plot_test_index[plot_test_index != 90]
 # plot_test_index = plot_test_index[plot_test_index != 120]
@@ -667,7 +484,7 @@ plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
 # ax.set_ylim(0, 0.2)
 ax.set_aspect('equal')
 plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4_all_particals'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+fig.savefig('4_all_particals_new'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 plt.show()
 
 ############################################################
@@ -762,7 +579,7 @@ norm_test_r = nan_norm(NT_r, axis=1)
 relative_errors_r = (norm_diff_r / norm_test_r)[:, None]
 
 relative_errors_xy = np.hstack([time_stamps[:, None], relative_errors_x,relative_errors_y, relative_errors_r])
-np.savetxt('Case4l2trajectory.csv', relative_errors_xy, fmt='%.18f', delimiter=',', newline='\n')
+np.savetxt('Case4l2trajectory_large.csv', relative_errors_xy, fmt='%.18f', delimiter=',', newline='\n')
 
 pearson_r_x = np.zeros(NE_x.shape[0])
 pearson_r_y = np.zeros(NE_y.shape[0])
@@ -790,7 +607,7 @@ for i in range(NE_x.shape[0]):
 
 # 组合并保存结果
 pearson_r_xy = np.hstack([time_stamps[:, None], pearson_r_x[:, None], pearson_r_y[:, None], pearson_r_r[:, None]])
-np.savetxt('Case4_pearson_r_values.csv', pearson_r_xy,
+np.savetxt('Case4_pearson_r_values_large.csv', pearson_r_xy,
            fmt='%.18f', delimiter=',', newline='\n',
            comments='')
 
@@ -823,364 +640,22 @@ np.savetxt('Case4_pearson_r_values.csv', pearson_r_xy,
 
 
 
-
-delta_index = delta_index.tolist()
-i = 60
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-x_plot_true = x_test[plot_number:plot_number + delta_index[i]]
-y_plot_true = y_test[plot_number:plot_number + delta_index[i]]
-x_plot_pred = x_pred[plot_number:plot_number + delta_index[i]]
-y_plot_pred = y_pred[plot_number:plot_number + delta_index[i]]
-
-NE_x_60 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
-NE_y_60 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
-np.savetxt('4NE_x_60.csv', NE_x_60, fmt='%.18f', delimiter=',', newline='\n')
-np.savetxt('4NE_y_60.csv', NE_y_60, fmt='%.18f', delimiter=',', newline='\n')
-
-fig = plt.figure(figsize=(6, 3), dpi=300)
-ax = fig.add_subplot(111)
-def annotate_point(label, x, y, xytext_offset):
-    ax.annotate(
-        label,
-        xy=(x, y),
-        xytext=xytext_offset,
-        arrowprops=dict(
-            arrowstyle='->',
-            connectionstyle="arc3,rad=0",  # 确保有延长线
-            shrinkA=0,                # 调整起点收缩距离
-            shrinkB=0                 # 调整终点收缩距离
-        ),
-        fontsize=8,
-    )
-plt.scatter(x_plot_true, y_plot_true,s=2, marker="x", c='r', label='True')
-plot_test_index = np.random.choice(98, 98, replace=False)
-for i in range(int(len(plot_test_index))):
-
-    j=plot_test_index[i]
-    print(j)
-    plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
-             color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=5)
-ax.set_ylabel('$y$', size=5)
-plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
-plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
-
-ax.set_aspect('equal')
-plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4particle test 60 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-fig = plt.figure(figsize=(6, 3), dpi=300)
-ax = fig.add_subplot(111)
-plt.scatter(x_plot_pred,y_plot_pred,s =2, marker="^",c='b', label='predict')
-plot_test_index = np.random.choice(98, 98, replace=False)
-for i in range(int(len(plot_test_index))):
-
-    j=plot_test_index[i]
-    print(j)
-    plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
-             color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=5)
-ax.set_ylabel('$y$', size=5)
-plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
-plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
-
-ax.set_aspect('equal')
-plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4particle test 60 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-
-
-i = 16
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-x_plot_true = x_test[plot_number:plot_number + delta_index[i]]
-y_plot_true = y_test[plot_number:plot_number + delta_index[i]]
-x_plot_pred = x_pred[plot_number:plot_number + delta_index[i]]
-y_plot_pred = y_pred[plot_number:plot_number + delta_index[i]]
-
-NE_x_16 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
-NE_y_16 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
-np.savetxt('4NE_x_16.csv', NE_x_16, fmt='%.18f', delimiter=',', newline='\n')
-np.savetxt('4NE_y_16.csv', NE_y_16, fmt='%.18f', delimiter=',', newline='\n')
-
-fig = plt.figure(figsize=(6, 3), dpi=300)
-ax = fig.add_subplot(111)
-def annotate_point(label, x, y, xytext_offset):
-    ax.annotate(
-        label,
-        xy=(x, y),
-        xytext=xytext_offset,
-        arrowprops=dict(
-            arrowstyle='->',
-            connectionstyle="arc3,rad=0",  # 确保有延长线
-            shrinkA=0,                # 调整起点收缩距离
-            shrinkB=0                 # 调整终点收缩距离
-        ),
-        fontsize=8,
-    )
-plt.scatter(x_plot_true, y_plot_true,s=2, marker="x", c='r', label='True')
-plot_test_index = np.random.choice(98, 98, replace=False)
-for i in range(int(len(plot_test_index))):
-
-    j=plot_test_index[i]
-    print(j)
-    plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
-             color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=5)
-ax.set_ylabel('$y$', size=5)
-plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
-plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
-
-ax.set_aspect('equal')
-plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4particle test 16 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-fig = plt.figure(figsize=(6, 3), dpi=300)
-ax = fig.add_subplot(111)
-plt.scatter(x_plot_pred,y_plot_pred,s =2, marker="^",c='b', label='predict')
-plot_test_index = np.random.choice(98, 98, replace=False)
-for i in range(int(len(plot_test_index))):
-
-    j=plot_test_index[i]
-    print(j)
-    plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
-             color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=5)
-ax.set_ylabel('$y$', size=5)
-plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
-plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
-
-ax.set_aspect('equal')
-plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4particle test 16 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-
-
-i = 57
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-x_plot_true = x_test[plot_number:plot_number + delta_index[i]]
-y_plot_true = y_test[plot_number:plot_number + delta_index[i]]
-x_plot_pred = x_pred[plot_number:plot_number + delta_index[i]]
-y_plot_pred = y_pred[plot_number:plot_number + delta_index[i]]
-
-NE_x_57 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
-NE_y_57 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
-np.savetxt('4NE_x_57.csv', NE_x_57, fmt='%.18f', delimiter=',', newline='\n')
-np.savetxt('4NE_y_57.csv', NE_y_57, fmt='%.18f', delimiter=',', newline='\n')
-
-fig = plt.figure(figsize=(6, 3), dpi=300)
-ax = fig.add_subplot(111)
-def annotate_point(label, x, y, xytext_offset):
-    ax.annotate(
-        label,
-        xy=(x, y),
-        xytext=xytext_offset,
-        arrowprops=dict(
-            arrowstyle='->',
-            connectionstyle="arc3,rad=0",  # 确保有延长线
-            shrinkA=0,                # 调整起点收缩距离
-            shrinkB=0                 # 调整终点收缩距离
-        ),
-        fontsize=8,
-    )
-plt.scatter(x_plot_true, y_plot_true,s=2, marker="x", c='r', label='True')
-plot_test_index = np.random.choice(98, 98, replace=False)
-for i in range(int(len(plot_test_index))):
-
-    j=plot_test_index[i]
-    print(j)
-    plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
-             color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=5)
-ax.set_ylabel('$y$', size=5)
-plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
-plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
-
-ax.set_aspect('equal')
-plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4particle test 57 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-fig = plt.figure(figsize=(6, 3), dpi=300)
-ax = fig.add_subplot(111)
-plt.scatter(x_plot_pred,y_plot_pred,s =2, marker="^",c='b', label='predict')
-plot_test_index = np.random.choice(98, 98, replace=False)
-for i in range(int(len(plot_test_index))):
-
-    j=plot_test_index[i]
-    print(j)
-    plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
-             color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=5)
-ax.set_ylabel('$y$', size=5)
-plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
-plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
-
-ax.set_aspect('equal')
-plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4particle test 57 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-
-i = 9
-plot_number = 0
-for j in range(int(len(delta_index))):
-    if j < i:
-        plot_number = plot_number + delta_index[j]
-x_plot_true = x_test[plot_number:plot_number + delta_index[i]]
-y_plot_true = y_test[plot_number:plot_number + delta_index[i]]
-x_plot_pred = x_pred[plot_number:plot_number + delta_index[i]]
-y_plot_pred = y_pred[plot_number:plot_number + delta_index[i]]
-
-NE_x_9 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
-NE_y_9 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
-np.savetxt('4NE_x_9.csv', NE_x_9, fmt='%.18f', delimiter=',', newline='\n')
-np.savetxt('4NE_y_9.csv', NE_y_9, fmt='%.18f', delimiter=',', newline='\n')
-
-fig = plt.figure(figsize=(6, 3), dpi=300)
-ax = fig.add_subplot(111)
-def annotate_point(label, x, y, xytext_offset):
-    ax.annotate(
-        label,
-        xy=(x, y),
-        xytext=xytext_offset,
-        arrowprops=dict(
-            arrowstyle='->',
-            connectionstyle="arc3,rad=0",  # 确保有延长线
-            shrinkA=0,                # 调整起点收缩距离
-            shrinkB=0                 # 调整终点收缩距离
-        ),
-        fontsize=8,
-    )
-plt.scatter(x_plot_true, y_plot_true,s=2, marker="x", c='r', label='True')
-plot_test_index = np.random.choice(98, 98, replace=False)
-for i in range(int(len(plot_test_index))):
-
-    j=plot_test_index[i]
-    print(j)
-    plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
-             color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=5)
-ax.set_ylabel('$y$', size=5)
-plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
-plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
-
-ax.set_aspect('equal')
-plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4particle test 9 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
-
-fig = plt.figure(figsize=(6, 3), dpi=300)
-ax = fig.add_subplot(111)
-plt.scatter(x_plot_pred,y_plot_pred,s =2, marker="^",c='b', label='predict')
-plot_test_index = np.random.choice(98, 98, replace=False)
-for i in range(int(len(plot_test_index))):
-
-    j=plot_test_index[i]
-    print(j)
-    plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
-             color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-
-handles, labels = plt.gca().get_legend_handles_labels()
-by_label = dict(zip(labels, handles))
-# plt.legend(by_label.values(), by_label.keys(),fontsize='small')
-#plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
-ax.set_xlabel('$x$', size=5)
-ax.set_ylabel('$y$', size=5)
-plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
-plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
-
-ax.set_aspect('equal')
-plt.rcParams['svg.fonttype'] = 'none'
-fig.savefig('4particle test 9 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-plt.show()
 #
-# x_plot_true = []
-# y_plot_true = []
-# x_plot_pred = []
-# y_plot_pred = []
-# for i in range(len(t_test)):
-#     if t_test[i] == 0.005 * 10 * (U / L):
-#         x_plot_true.append(x_test[i])
-#         y_plot_true.append(y_test[i])
-#         x_plot_pred.append(x_pred[i])
-#         y_plot_pred.append(y_pred[i])
-# NE_x_10 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
-# NE_y_10 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
-# np.savetxt('4NE_x_10.csv', NE_x_10, fmt='%.18f', delimiter=',', newline='\n')
-# np.savetxt('4NE_y_10.csv', NE_y_10, fmt='%.18f', delimiter=',', newline='\n')
-# colors = np.random.rand(len(x_plot_true),3)
-# # fig = plt.figure(figsize=(9, 6), dpi=300)
-# # ax = fig.add_subplot(111)
-# # plt.scatter(x_plot_true,y_plot_true,s =15, marker="o",c=colors, rasterized=True)
-# # ax.set_xlabel('$x$', size=20)
-# # ax.set_ylabel('$y$', size=20)
-# # ax.set_title('particle test t=2 true', fontsize = 20)
-# # # plt.legend()
-# # ax.tick_params(labelsize=15)
-# # plt.axis('equal')
-# # fig.savefig('particle_test_t=2_true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-# # plt.show()
-# # fig = plt.figure(figsize=(9, 6), dpi=300)
-# # ax = fig.add_subplot(111)
-# # plt.scatter(x_plot_pred,y_plot_pred,s =15, marker="o",c=colors, rasterized=True)
-# # ax.set_xlabel('$x$', size=20)
-# # ax.set_ylabel('$y$', size=20)
-# # ax.set_title('particle test t=2 pred', fontsize = 20)
-# # # plt.legend()
-# # ax.tick_params(labelsize=15)
-# # plt.axis('equal')
-# # fig.savefig('particle_test_t=2_pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-# # plt.show()
+# delta_index = delta_index.tolist()
+# i = 60
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# x_plot_true = x_test[plot_number:plot_number + delta_index[i]]
+# y_plot_true = y_test[plot_number:plot_number + delta_index[i]]
+# x_plot_pred = x_pred[plot_number:plot_number + delta_index[i]]
+# y_plot_pred = y_pred[plot_number:plot_number + delta_index[i]]
 #
-#
+# NE_x_60 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
+# NE_y_60 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
+# np.savetxt('4NE_x_60.csv', NE_x_60, fmt='%.18f', delimiter=',', newline='\n')
+# np.savetxt('4NE_y_60.csv', NE_y_60, fmt='%.18f', delimiter=',', newline='\n')
 #
 # fig = plt.figure(figsize=(6, 3), dpi=300)
 # ax = fig.add_subplot(111)
@@ -1197,103 +672,70 @@ plt.show()
 #         ),
 #         fontsize=8,
 #     )
+# plt.scatter(x_plot_true, y_plot_true,s=2, marker="x", c='r', label='True')
 # plot_test_index = np.random.choice(98, 98, replace=False)
-#
 # for i in range(int(len(plot_test_index))):
 #
 #     j=plot_test_index[i]
 #     print(j)
 #     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
 #              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-#     plt.scatter(x_plot_true, y_plot_true, s=5, marker="o", c=colors, rasterized=True)
+#
 # handles, labels = plt.gca().get_legend_handles_labels()
 # by_label = dict(zip(labels, handles))
 # # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
 # ax.set_xlabel('$x$', size=5)
 # ax.set_ylabel('$y$', size=5)
 # plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
 # plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+#
 # ax.set_aspect('equal')
 # plt.rcParams['svg.fonttype'] = 'none'
-# fig.savefig('4particle test t=10 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# fig.savefig('4particle test 60 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 # plt.show()
 #
 # fig = plt.figure(figsize=(6, 3), dpi=300)
 # ax = fig.add_subplot(111)
-# def annotate_point(label, x, y, xytext_offset):
-#     ax.annotate(
-#         label,
-#         xy=(x, y),
-#         xytext=xytext_offset,
-#         arrowprops=dict(
-#             arrowstyle='->',
-#             connectionstyle="arc3,rad=0",  # 确保有延长线
-#             shrinkA=0,                # 调整起点收缩距离
-#             shrinkB=0                 # 调整终点收缩距离
-#         ),
-#         fontsize=8,
-#     )
+# plt.scatter(x_plot_pred,y_plot_pred,s =2, marker="^",c='b', label='predict')
 # plot_test_index = np.random.choice(98, 98, replace=False)
-#
 # for i in range(int(len(plot_test_index))):
 #
 #     j=plot_test_index[i]
 #     print(j)
 #     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
 #              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-#     plt.scatter(x_plot_pred, y_plot_pred, s=5, marker="o", c=colors, rasterized=True)
+#
 # handles, labels = plt.gca().get_legend_handles_labels()
 # by_label = dict(zip(labels, handles))
 # # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
 # ax.set_xlabel('$x$', size=5)
 # ax.set_ylabel('$y$', size=5)
 # plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
 # plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+#
 # ax.set_aspect('equal')
 # plt.rcParams['svg.fonttype'] = 'none'
-# fig.savefig('4particle test t=10 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# fig.savefig('4particle test 60 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 # plt.show()
 #
 #
-# x_plot_true = []
-# y_plot_true = []
-# x_plot_pred = []
-# y_plot_pred = []
-# for i in range(len(t_test)):
-#     if t_test[i] == 0.005 * 100 * (U / L):
-#         x_plot_true.append(x_test[i])
-#         y_plot_true.append(y_test[i])
-#         x_plot_pred.append(x_pred[i])
-#         y_plot_pred.append(y_pred[i])
-# NE_x_100 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
-# NE_y_100 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
-# np.savetxt('4NE_x_100.csv', NE_x_100, fmt='%.18f', delimiter=',', newline='\n')
-# np.savetxt('4NE_y_100.csv', NE_y_100, fmt='%.18f', delimiter=',', newline='\n')
-# colors = np.random.rand(len(x_plot_true),3)
-# # fig = plt.figure(figsize=(9, 6), dpi=300)
-# # ax = fig.add_subplot(111)
-# # plt.scatter(x_plot_true,y_plot_true,s =15, marker="o",c=colors, rasterized=True)
-# # ax.set_xlabel('$x$', size=20)
-# # ax.set_ylabel('$y$', size=20)
-# # ax.set_title('particle test t=2 true', fontsize = 20)
-# # # plt.legend()
-# # ax.tick_params(labelsize=15)
-# # plt.axis('equal')
-# # fig.savefig('particle_test_t=2_true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-# # plt.show()
-# # fig = plt.figure(figsize=(9, 6), dpi=300)
-# # ax = fig.add_subplot(111)
-# # plt.scatter(x_plot_pred,y_plot_pred,s =15, marker="o",c=colors, rasterized=True)
-# # ax.set_xlabel('$x$', size=20)
-# # ax.set_ylabel('$y$', size=20)
-# # ax.set_title('particle test t=2 pred', fontsize = 20)
-# # # plt.legend()
-# # ax.tick_params(labelsize=15)
-# # plt.axis('equal')
-# # fig.savefig('particle_test_t=2_pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
-# # plt.show()
 #
+# i = 16
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# x_plot_true = x_test[plot_number:plot_number + delta_index[i]]
+# y_plot_true = y_test[plot_number:plot_number + delta_index[i]]
+# x_plot_pred = x_pred[plot_number:plot_number + delta_index[i]]
+# y_plot_pred = y_pred[plot_number:plot_number + delta_index[i]]
 #
+# NE_x_16 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
+# NE_y_16 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
+# np.savetxt('4NE_x_16.csv', NE_x_16, fmt='%.18f', delimiter=',', newline='\n')
+# np.savetxt('4NE_y_16.csv', NE_y_16, fmt='%.18f', delimiter=',', newline='\n')
 #
 # fig = plt.figure(figsize=(6, 3), dpi=300)
 # ax = fig.add_subplot(111)
@@ -1310,26 +752,70 @@ plt.show()
 #         ),
 #         fontsize=8,
 #     )
+# plt.scatter(x_plot_true, y_plot_true,s=2, marker="x", c='r', label='True')
 # plot_test_index = np.random.choice(98, 98, replace=False)
-#
 # for i in range(int(len(plot_test_index))):
 #
 #     j=plot_test_index[i]
 #     print(j)
 #     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
 #              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-#     plt.scatter(x_plot_true, y_plot_true, s=5, marker="o", c=colors, rasterized=True)
+#
 # handles, labels = plt.gca().get_legend_handles_labels()
 # by_label = dict(zip(labels, handles))
 # # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
 # ax.set_xlabel('$x$', size=5)
 # ax.set_ylabel('$y$', size=5)
 # plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
 # plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+#
 # ax.set_aspect('equal')
 # plt.rcParams['svg.fonttype'] = 'none'
-# fig.savefig('4particle test t=100 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# fig.savefig('4particle test 16 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
 # plt.show()
+#
+# fig = plt.figure(figsize=(6, 3), dpi=300)
+# ax = fig.add_subplot(111)
+# plt.scatter(x_plot_pred,y_plot_pred,s =2, marker="^",c='b', label='predict')
+# plot_test_index = np.random.choice(98, 98, replace=False)
+# for i in range(int(len(plot_test_index))):
+#
+#     j=plot_test_index[i]
+#     print(j)
+#     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
+#              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
+#
+# handles, labels = plt.gca().get_legend_handles_labels()
+# by_label = dict(zip(labels, handles))
+# # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
+# ax.set_xlabel('$x$', size=5)
+# ax.set_ylabel('$y$', size=5)
+# plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
+# plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+#
+# ax.set_aspect('equal')
+# plt.rcParams['svg.fonttype'] = 'none'
+# fig.savefig('4particle test 16 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+#
+#
+# i = 57
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# x_plot_true = x_test[plot_number:plot_number + delta_index[i]]
+# y_plot_true = y_test[plot_number:plot_number + delta_index[i]]
+# x_plot_pred = x_pred[plot_number:plot_number + delta_index[i]]
+# y_plot_pred = y_pred[plot_number:plot_number + delta_index[i]]
+#
+# NE_x_57 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
+# NE_y_57 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
+# np.savetxt('4NE_x_57.csv', NE_x_57, fmt='%.18f', delimiter=',', newline='\n')
+# np.savetxt('4NE_y_57.csv', NE_y_57, fmt='%.18f', delimiter=',', newline='\n')
 #
 # fig = plt.figure(figsize=(6, 3), dpi=300)
 # ax = fig.add_subplot(111)
@@ -1346,15 +832,346 @@ plt.show()
 #         ),
 #         fontsize=8,
 #     )
+# plt.scatter(x_plot_true, y_plot_true,s=2, marker="x", c='r', label='True')
 # plot_test_index = np.random.choice(98, 98, replace=False)
-#
 # for i in range(int(len(plot_test_index))):
 #
 #     j=plot_test_index[i]
 #     print(j)
 #     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
 #              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
-#     plt.scatter(x_plot_pred, y_plot_pred, s=5, marker="o", c=colors, rasterized=True)
+#
+# handles, labels = plt.gca().get_legend_handles_labels()
+# by_label = dict(zip(labels, handles))
+# # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
+# ax.set_xlabel('$x$', size=5)
+# ax.set_ylabel('$y$', size=5)
+# plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
+# plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+#
+# ax.set_aspect('equal')
+# plt.rcParams['svg.fonttype'] = 'none'
+# fig.savefig('4particle test 57 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+# fig = plt.figure(figsize=(6, 3), dpi=300)
+# ax = fig.add_subplot(111)
+# plt.scatter(x_plot_pred,y_plot_pred,s =2, marker="^",c='b', label='predict')
+# plot_test_index = np.random.choice(98, 98, replace=False)
+# for i in range(int(len(plot_test_index))):
+#
+#     j=plot_test_index[i]
+#     print(j)
+#     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
+#              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
+#
+# handles, labels = plt.gca().get_legend_handles_labels()
+# by_label = dict(zip(labels, handles))
+# # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
+# ax.set_xlabel('$x$', size=5)
+# ax.set_ylabel('$y$', size=5)
+# plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
+# plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+#
+# ax.set_aspect('equal')
+# plt.rcParams['svg.fonttype'] = 'none'
+# fig.savefig('4particle test 57 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+#
+# i = 9
+# plot_number = 0
+# for j in range(int(len(delta_index))):
+#     if j < i:
+#         plot_number = plot_number + delta_index[j]
+# x_plot_true = x_test[plot_number:plot_number + delta_index[i]]
+# y_plot_true = y_test[plot_number:plot_number + delta_index[i]]
+# x_plot_pred = x_pred[plot_number:plot_number + delta_index[i]]
+# y_plot_pred = y_pred[plot_number:plot_number + delta_index[i]]
+#
+# NE_x_9 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
+# NE_y_9 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
+# np.savetxt('4NE_x_9.csv', NE_x_9, fmt='%.18f', delimiter=',', newline='\n')
+# np.savetxt('4NE_y_9.csv', NE_y_9, fmt='%.18f', delimiter=',', newline='\n')
+#
+# fig = plt.figure(figsize=(6, 3), dpi=300)
+# ax = fig.add_subplot(111)
+# def annotate_point(label, x, y, xytext_offset):
+#     ax.annotate(
+#         label,
+#         xy=(x, y),
+#         xytext=xytext_offset,
+#         arrowprops=dict(
+#             arrowstyle='->',
+#             connectionstyle="arc3,rad=0",  # 确保有延长线
+#             shrinkA=0,                # 调整起点收缩距离
+#             shrinkB=0                 # 调整终点收缩距离
+#         ),
+#         fontsize=8,
+#     )
+# plt.scatter(x_plot_true, y_plot_true,s=2, marker="x", c='r', label='True')
+# plot_test_index = np.random.choice(98, 98, replace=False)
+# for i in range(int(len(plot_test_index))):
+#
+#     j=plot_test_index[i]
+#     print(j)
+#     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
+#              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
+#
+# handles, labels = plt.gca().get_legend_handles_labels()
+# by_label = dict(zip(labels, handles))
+# # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
+# ax.set_xlabel('$x$', size=5)
+# ax.set_ylabel('$y$', size=5)
+# plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
+# plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+#
+# ax.set_aspect('equal')
+# plt.rcParams['svg.fonttype'] = 'none'
+# fig.savefig('4particle test 9 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+#
+# fig = plt.figure(figsize=(6, 3), dpi=300)
+# ax = fig.add_subplot(111)
+# plt.scatter(x_plot_pred,y_plot_pred,s =2, marker="^",c='b', label='predict')
+# plot_test_index = np.random.choice(98, 98, replace=False)
+# for i in range(int(len(plot_test_index))):
+#
+#     j=plot_test_index[i]
+#     print(j)
+#     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
+#              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
+#
+# handles, labels = plt.gca().get_legend_handles_labels()
+# by_label = dict(zip(labels, handles))
+# # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# #plt.scatter(x0_f_train,y0_f_train,s =0.2, marker="x",c='k')
+# ax.set_xlabel('$x$', size=5)
+# ax.set_ylabel('$y$', size=5)
+# plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
+# plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+#
+# ax.set_aspect('equal')
+# plt.rcParams['svg.fonttype'] = 'none'
+# fig.savefig('4particle test 9 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# plt.show()
+# #
+# # x_plot_true = []
+# # y_plot_true = []
+# # x_plot_pred = []
+# # y_plot_pred = []
+# # for i in range(len(t_test)):
+# #     if t_test[i] == 0.005 * 10 * (U / L):
+# #         x_plot_true.append(x_test[i])
+# #         y_plot_true.append(y_test[i])
+# #         x_plot_pred.append(x_pred[i])
+# #         y_plot_pred.append(y_pred[i])
+# # NE_x_10 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
+# # NE_y_10 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
+# # np.savetxt('4NE_x_10.csv', NE_x_10, fmt='%.18f', delimiter=',', newline='\n')
+# # np.savetxt('4NE_y_10.csv', NE_y_10, fmt='%.18f', delimiter=',', newline='\n')
+# # colors = np.random.rand(len(x_plot_true),3)
+# # # fig = plt.figure(figsize=(9, 6), dpi=300)
+# # # ax = fig.add_subplot(111)
+# # # plt.scatter(x_plot_true,y_plot_true,s =15, marker="o",c=colors, rasterized=True)
+# # # ax.set_xlabel('$x$', size=20)
+# # # ax.set_ylabel('$y$', size=20)
+# # # ax.set_title('particle test t=2 true', fontsize = 20)
+# # # # plt.legend()
+# # # ax.tick_params(labelsize=15)
+# # # plt.axis('equal')
+# # # fig.savefig('particle_test_t=2_true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# # # plt.show()
+# # # fig = plt.figure(figsize=(9, 6), dpi=300)
+# # # ax = fig.add_subplot(111)
+# # # plt.scatter(x_plot_pred,y_plot_pred,s =15, marker="o",c=colors, rasterized=True)
+# # # ax.set_xlabel('$x$', size=20)
+# # # ax.set_ylabel('$y$', size=20)
+# # # ax.set_title('particle test t=2 pred', fontsize = 20)
+# # # # plt.legend()
+# # # ax.tick_params(labelsize=15)
+# # # plt.axis('equal')
+# # # fig.savefig('particle_test_t=2_pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# # # plt.show()
+# #
+# #
+# #
+# # fig = plt.figure(figsize=(6, 3), dpi=300)
+# # ax = fig.add_subplot(111)
+# # def annotate_point(label, x, y, xytext_offset):
+# #     ax.annotate(
+# #         label,
+# #         xy=(x, y),
+# #         xytext=xytext_offset,
+# #         arrowprops=dict(
+# #             arrowstyle='->',
+# #             connectionstyle="arc3,rad=0",  # 确保有延长线
+# #             shrinkA=0,                # 调整起点收缩距离
+# #             shrinkB=0                 # 调整终点收缩距离
+# #         ),
+# #         fontsize=8,
+# #     )
+# # plot_test_index = np.random.choice(98, 98, replace=False)
+# #
+# # for i in range(int(len(plot_test_index))):
+# #
+# #     j=plot_test_index[i]
+# #     print(j)
+# #     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
+# #              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
+# #     plt.scatter(x_plot_true, y_plot_true, s=5, marker="o", c=colors, rasterized=True)
+# # handles, labels = plt.gca().get_legend_handles_labels()
+# # by_label = dict(zip(labels, handles))
+# # # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# # ax.set_xlabel('$x$', size=5)
+# # ax.set_ylabel('$y$', size=5)
+# # plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
+# # plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+# # ax.set_aspect('equal')
+# # plt.rcParams['svg.fonttype'] = 'none'
+# # fig.savefig('4particle test t=10 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# # plt.show()
+# #
+# # fig = plt.figure(figsize=(6, 3), dpi=300)
+# # ax = fig.add_subplot(111)
+# # def annotate_point(label, x, y, xytext_offset):
+# #     ax.annotate(
+# #         label,
+# #         xy=(x, y),
+# #         xytext=xytext_offset,
+# #         arrowprops=dict(
+# #             arrowstyle='->',
+# #             connectionstyle="arc3,rad=0",  # 确保有延长线
+# #             shrinkA=0,                # 调整起点收缩距离
+# #             shrinkB=0                 # 调整终点收缩距离
+# #         ),
+# #         fontsize=8,
+# #     )
+# # plot_test_index = np.random.choice(98, 98, replace=False)
+# #
+# # for i in range(int(len(plot_test_index))):
+# #
+# #     j=plot_test_index[i]
+# #     print(j)
+# #     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
+# #              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
+# #     plt.scatter(x_plot_pred, y_plot_pred, s=5, marker="o", c=colors, rasterized=True)
+# # handles, labels = plt.gca().get_legend_handles_labels()
+# # by_label = dict(zip(labels, handles))
+# # # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# # ax.set_xlabel('$x$', size=5)
+# # ax.set_ylabel('$y$', size=5)
+# # plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
+# # plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+# # ax.set_aspect('equal')
+# # plt.rcParams['svg.fonttype'] = 'none'
+# # fig.savefig('4particle test t=10 pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# # plt.show()
+# #
+# #
+# # x_plot_true = []
+# # y_plot_true = []
+# # x_plot_pred = []
+# # y_plot_pred = []
+# # for i in range(len(t_test)):
+# #     if t_test[i] == 0.005 * 100 * (U / L):
+# #         x_plot_true.append(x_test[i])
+# #         y_plot_true.append(y_test[i])
+# #         x_plot_pred.append(x_pred[i])
+# #         y_plot_pred.append(y_pred[i])
+# # NE_x_100 = abs(np.array(x_plot_pred) - np.array(x_plot_true)) / 1
+# # NE_y_100 = abs(np.array(y_plot_pred) - np.array(y_plot_true)) / 1
+# # np.savetxt('4NE_x_100.csv', NE_x_100, fmt='%.18f', delimiter=',', newline='\n')
+# # np.savetxt('4NE_y_100.csv', NE_y_100, fmt='%.18f', delimiter=',', newline='\n')
+# # colors = np.random.rand(len(x_plot_true),3)
+# # # fig = plt.figure(figsize=(9, 6), dpi=300)
+# # # ax = fig.add_subplot(111)
+# # # plt.scatter(x_plot_true,y_plot_true,s =15, marker="o",c=colors, rasterized=True)
+# # # ax.set_xlabel('$x$', size=20)
+# # # ax.set_ylabel('$y$', size=20)
+# # # ax.set_title('particle test t=2 true', fontsize = 20)
+# # # # plt.legend()
+# # # ax.tick_params(labelsize=15)
+# # # plt.axis('equal')
+# # # fig.savefig('particle_test_t=2_true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# # # plt.show()
+# # # fig = plt.figure(figsize=(9, 6), dpi=300)
+# # # ax = fig.add_subplot(111)
+# # # plt.scatter(x_plot_pred,y_plot_pred,s =15, marker="o",c=colors, rasterized=True)
+# # # ax.set_xlabel('$x$', size=20)
+# # # ax.set_ylabel('$y$', size=20)
+# # # ax.set_title('particle test t=2 pred', fontsize = 20)
+# # # # plt.legend()
+# # # ax.tick_params(labelsize=15)
+# # # plt.axis('equal')
+# # # fig.savefig('particle_test_t=2_pred'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# # # plt.show()
+# #
+# #
+# #
+# # fig = plt.figure(figsize=(6, 3), dpi=300)
+# # ax = fig.add_subplot(111)
+# # def annotate_point(label, x, y, xytext_offset):
+# #     ax.annotate(
+# #         label,
+# #         xy=(x, y),
+# #         xytext=xytext_offset,
+# #         arrowprops=dict(
+# #             arrowstyle='->',
+# #             connectionstyle="arc3,rad=0",  # 确保有延长线
+# #             shrinkA=0,                # 调整起点收缩距离
+# #             shrinkB=0                 # 调整终点收缩距离
+# #         ),
+# #         fontsize=8,
+# #     )
+# # plot_test_index = np.random.choice(98, 98, replace=False)
+# #
+# # for i in range(int(len(plot_test_index))):
+# #
+# #     j=plot_test_index[i]
+# #     print(j)
+# #     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
+# #              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
+# #     plt.scatter(x_plot_true, y_plot_true, s=5, marker="o", c=colors, rasterized=True)
+# # handles, labels = plt.gca().get_legend_handles_labels()
+# # by_label = dict(zip(labels, handles))
+# # # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
+# # ax.set_xlabel('$x$', size=5)
+# # ax.set_ylabel('$y$', size=5)
+# # plt.tick_params(axis='x', labelsize=5)  # 调整x轴刻度线字体大小
+# # plt.tick_params(axis='y', labelsize=5)  # 调整y轴刻度线字体大小
+# # ax.set_aspect('equal')
+# # plt.rcParams['svg.fonttype'] = 'none'
+# # fig.savefig('4particle test t=100 true'  + ".svg", bbox_inches='tight', dpi=600, pad_inches=0.1)
+# # plt.show()
+# #
+# # fig = plt.figure(figsize=(6, 3), dpi=300)
+# # ax = fig.add_subplot(111)
+# # def annotate_point(label, x, y, xytext_offset):
+# #     ax.annotate(
+# #         label,
+# #         xy=(x, y),
+# #         xytext=xytext_offset,
+# #         arrowprops=dict(
+# #             arrowstyle='->',
+# #             connectionstyle="arc3,rad=0",  # 确保有延长线
+# #             shrinkA=0,                # 调整起点收缩距离
+# #             shrinkB=0                 # 调整终点收缩距离
+# #         ),
+# #         fontsize=8,
+# #     )
+# # plot_test_index = np.random.choice(98, 98, replace=False)
+# #
+# # for i in range(int(len(plot_test_index))):
+# #
+# #     j=plot_test_index[i]
+# #     print(j)
+# #     plt.plot(x_test[index_plot[j]:index_plot[j]+delta_index[j]], y_test[index_plot[j]:index_plot[j]+delta_index[j]],
+# #              color='gray', alpha=0.7, label='Truth', linestyle='--',linewidth=0.7)
+# #     plt.scatter(x_plot_pred, y_plot_pred, s=5, marker="o", c=colors, rasterized=True)
 # handles, labels = plt.gca().get_legend_handles_labels()
 # by_label = dict(zip(labels, handles))
 # # plt.legend(by_label.values(), by_label.keys(),fontsize='small')
