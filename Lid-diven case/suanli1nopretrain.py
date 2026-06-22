@@ -402,192 +402,20 @@ B_gauss_2 = B_gauss_2 * 0.1
 layers_1 = [50 * 2, 40, 40, 40, 40, 2]
 layers_2 = [50 * 2, 60, 60, 60, 60, 60, 60, 2]
 # Load Data
-filename = "fangqiang.csv"
 
-x_Matrix = pd.read_csv(filename, header=3)
-train_data = np.array(x_Matrix)
+train_data = np.load('Case1_train_data.npy')
+x0_train = train_data[:, 0:1]
+y0_train = train_data[:, 1:2]
+t0_train = train_data[:, 2:3]
+x_net = train_data[:, 3:4]
+y_net = train_data[:, 4:5]
+t_net = train_data[:, 5:6]
+u_net = train_data[:, 6:7]
+v_net = train_data[:, 7:8]
+p_net = train_data[:, 8:9]
 
-#print('从fluent导出的训练数据为：')
-train_data = np.delete(train_data, 2, axis=1)
-# train_data = np.delete(train_data, 4, axis=1)
-# train_data = np.delete(train_data, 0, axis=0)
-train_data = train_data.astype(float)
-np.set_printoptions(suppress=True)
-#print(train_data_test)
-# index = np.argwhere(train_data[:, 3:4] == 0.500999987 or train_data[:, 3:4] == 0.550999999 or train_data[:, 3:4] == 0.550999999)[:, 0:1].flatten()
-# N_p = 500
-# idx_p = np.random.choice(index.shape[0], N_p, replace=False)
-# index = index[idx_p]
-
-id = train_data[:, 2:3]
-x = train_data[:, 0:1]
-y = train_data[:, 1:2]
-t = train_data[:, 3:4]
-p = train_data[:, 6:7]
-u = train_data[:, 4:5]
-v = train_data[:, 5:6]
-
-extrater = []
-for i in range(len(x)):
-    if t[i]<22:
-        extrater.append(i)
-
-id = np.delete(id, extrater, axis=0)
-x = np.delete(x, extrater, axis=0)
-y = np.delete(y, extrater, axis=0)
-t = np.delete(t, extrater, axis=0)
-p = np.delete(p, extrater, axis=0)
-u = np.delete(u, extrater, axis=0)
-v = np.delete(v, extrater, axis=0)
-
-
-
-
-def find_diff_positions(arr):
-    diff_positions = []
-    diff_positions.append(0)
-    for i in range(1, len(arr)):
-        if arr[i] - arr[i-1] != 0:
-            diff_positions.append(i)
-    return diff_positions
-index = find_diff_positions(id)
-index.append(int(len(id)))
-# for i in index:
-#     print(id[i])
-# x = [i-0.01 for i in x]
-# y = [i+0.02 for i in y]
-# u_min = min(abs(u))
-# v_min = min(abs(v))
-# uv_min = float(min(u_min, v_min))
-
-
-t = [i-22 for i in t]
-# u = [i-uv_min for i in u]
-# v = [i-uv_min for i in v]
-
-x = np.array(x).flatten()[:, None]
-y = np.array(y).flatten()[:, None]
-p = np.array(p).flatten()[:, None]
-u = np.array(u).flatten()[:, None]
-v = np.array(v).flatten()[:, None]
-t = np.array(t).flatten()[:, None]
-
-x_ab = max(abs(x))
-y_ab = max(abs(y))
-L = float(max(x_ab, y_ab))
-u_ab = max(abs(u))
-v_ab = max(abs(v))
-U = float(max(u_ab, v_ab))
-
-# U = 1
-# L = 0.01
-x_train = x / L
-y_train = y / L
-t_train = t * (U / L)
-u_train = u / U
-v_train = v / U
-p_train = p / (1 * (U ** 2))
-
-
-k = 0
-x00_train = []
-y00_train = []
-t00_train = []
-x0_train = []
-y0_train = []
-t0_train = []
-x_net =[]
-y_net =[]
-t_net =[]
-u_net =[]
-v_net =[]
-p_net =[]
-# par_num = []
-# delta_i = 1400
-
-for i in index[:-1]:
-    x0 = x_train[i]
-    y0 = y_train[i]
-    t0 = t_train[i]
-    delta_i = index[k+1] - index[k]
-    k = k+1
-    for j in range(delta_i):
-        x00_train.append(x0)
-        y00_train.append(y0)
-        t00_train.append(t0)
-
-# k = 0
-# for i in index:
-index = np.array(index)
-N_p = 200
-N_p_test = 100
-
-all_idx = np.arange(index.shape[0]-1)
-idx_p = np.random.choice(index.shape[0]-1, N_p, replace=False)
-remaining = np.setdiff1d(all_idx, idx_p)
-
-
-idx_test = np.random.choice(remaining, N_p_test, replace=False)
-
-remaining_idx = np.setdiff1d(np.arange(index.shape[0]-1), idx_p)
-
-idx_p_sort = np.sort(idx_p)
-idx_test_sort = np.sort(idx_test)
-
-leak = list(set(idx_p) & set(idx_test))
-
-if leak:
-    print(f"Leakage detected: {leak}")
-    sys.exit(1)
-
-
-idx_p1 = [i+1 for i in idx_p]
-index_N = index[idx_p]
-delta_index = index[idx_p1] - index_N
-for i in range(int(len(index_N))):
-    x0_train.append(x00_train[index_N[i]:index_N[i] + delta_index[i]])
-    y0_train.append(y00_train[index_N[i]:index_N[i] + delta_index[i]])
-    t0_train.append(t00_train[index_N[i]:index_N[i] + delta_index[i]])
-    x_net.append(x_train[index_N[i]:index_N[i]+delta_index[i]])
-    y_net.append(y_train[index_N[i]:index_N[i]+delta_index[i]])
-    t_net.append(t_train[index_N[i]:index_N[i]+delta_index[i]])
-    u_net.append(u_train[index_N[i]:index_N[i]+delta_index[i]])
-    v_net.append(v_train[index_N[i]:index_N[i]+delta_index[i]])
-    p_net.append(p_train[index_N[i]:index_N[i]+delta_index[i]])
-
-# x_in = x_train
-# y_in = y_train
-# t_in = t_train
-# u_in = u_train
-# v_in = v_train
-# p_in = p_train
-# x_net.append(x_in)
-# y_net.append(y_in)
-# t_net.append(t_in)
-# u_net.append(u_in)
-# v_net.append(v_in)
-# p_net.append(p_in)
-x0_train = list(flatten(x0_train))
-y0_train = list(flatten(y0_train))
-t0_train = list(flatten(t0_train))
-x_net = list(flatten(x_net))
-y_net = list(flatten(y_net))
-u_net = list(flatten(u_net))
-v_net = list(flatten(v_net))
-p_net = list(flatten(p_net))
-t_net = list(flatten(t_net))
-
-x0_train = np.array(x0_train).flatten()[:, None]
-y0_train = np.array(y0_train).flatten()[:, None]
-t0_train = np.array(t0_train).flatten()[:, None]
-x_net = np.array(x_net).flatten()[:, None]
-y_net = np.array(y_net).flatten()[:, None]
-t_net = np.array(t_net).flatten()[:, None]
-u_net = np.array(u_net).flatten()[:, None]
-v_net = np.array(v_net).flatten()[:, None]
-p_net = np.array(p_net).flatten()[:, None]
-
-
+L=0.998858511
+U=0.969542086
 
 
 
